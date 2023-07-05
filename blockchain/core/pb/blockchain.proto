@@ -1,0 +1,13 @@
+syntax = "proto3";
+package core;
+
+option go_package = "./blockchain/core/pb";
+
+message Block {
+    int64 timestamp = 1;
+    uint64 nonce = 2;
+    int64 number = 3;
+    bytes data = 4;
+    bytes prev_block_hash = 5;
+    bytes hash = 6;
+}
