@@ -3,10 +3,9 @@ package db
 import (
 	"errors"
 	"fmt"
-	"path2perpetuity/blockchain/core/common"
-	"sync"
+	"path2perpetuity/blockchain/core/types"
 
-	"github.com/prologic/bitcask"
+	badger "github.com/dgraph-io/badger/v3"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -14,60 +13,50 @@ var ErrNotFound = errors.New("not found")
 var lastBlockHashKey = []byte("l")
 
 type Database struct {
-	mu sync.RWMutex
-	db *bitcask.Bitcask
+	cli *badger.DB
 }
 
 func New(path string) (*Database, error) {
-	db, err := bitcask.Open(path)
+	cli, err := badger.Open(badger.DefaultOptions(path))
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
 
-	return &Database{db: db}, nil
+	return &Database{cli: cli}, nil
 }
 
-func (db *Database) LastBlockHash() (common.Hash, error) {
-	data, err := db.get(lastBlockHashKey)
-	if err != nil {
-		return common.EmptyHash, nil
-	}
+func (db *Database) LastBlockHash() (types.Hash, error) {
+	var data []byte
 
-	return common.HashFromSlice(data), nil
-}
-
-func (db *Database) UpdateLastBlockHash(hash common.Hash) error {
-	return db.put(lastBlockHashKey, hash[:])
-}
-
-func (db *Database) GetByHash(hash common.Hash) ([]byte, error) {
-	return db.get(hash[:])
-}
-
-func (db *Database) PutByHash(hash common.Hash, data []byte) error {
-	return db.put(hash[:], data)
-}
-
-func (db *Database) get(key []byte) ([]byte, error) {
-	db.mu.RLock()
-	data, err := db.db.Get(key)
-	db.mu.RUnlock()
-
-	if err != nil {
-		if errors.Is(err, bitcask.ErrKeyNotFound) {
-			return nil, ErrNotFound
+	err := db.cli.View(func(txn *badger.Txn) error {
+		item, err := txn.Get(lastBlockHashKey)
+		if err != nil {
+			return fmt.Errorf("get value: %w", err)
 		}
 
-		return nil, fmt.Errorf("get from db: %w", err)
+		data, err = item.ValueCopy(nil)
+		if err != nil {
+			return fmt.Errorf("copy value: %w", err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		if errors.Is(err, badger.ErrKeyNotFound) {
+			err = ErrNotFound
+		}
+
+		return types.EmptyHash, err
 	}
 
-	return data, nil
+	return types.HashFromSlice(data), nil
 }
 
-func (db *Database) put(key, value []byte) error {
-	db.mu.Lock()
-	err := db.db.Put(key, value)
-	db.mu.Unlock()
+func (db *Database) SaveBlock(block *types.Block) error {
+	return nil
+}
 
-	return err
+func (db *Database) Close() {
+	db.cli.Close()
 }

@@ -3,17 +3,25 @@ package chain
 import (
 	"errors"
 	"fmt"
+	"log"
 	"path2perpetuity/blockchain/core/db"
+	"path2perpetuity/blockchain/core/types"
 	"sync"
 )
 
+var ErrInvalidParentBlock = errors.New("invalid parent block")
+
 type Config struct {
-	DBPath string
+	DBPath    string
+	Consensus types.ConsesusProtocol
 }
 
 type Blockchain struct {
-	mu   sync.RWMutex
-	tail *Block // last block, use getter lastBlock()
+	mu sync.RWMutex
+
+	cons types.ConsesusProtocol
+
+	tail *types.Block // last block, use getter lastBlock()
 	db   *db.Database
 }
 
@@ -24,29 +32,32 @@ func New(cfg *Config) (*Blockchain, error) {
 	}
 
 	bc := Blockchain{
-		db: database,
+		cons: cfg.Consensus,
+		db:   database,
 	}
 
 	if _, err = database.LastBlockHash(); err != nil {
 		if !errors.Is(err, db.ErrNotFound) {
-			return nil, fmt.Errorf("get last block: %w", err)
+			return nil, fmt.Errorf("get last block hash: %w", err)
 		}
 
-		genesisBlock, err := NewGenesisBlock()
+		genesisBlock, err := types.NewGenesisBlock(cfg.Consensus)
 		if err != nil {
 			return nil, fmt.Errorf("genesis block: %w", err)
 		}
 
-		if err = bc.saveNewBlock(genesisBlock); err != nil {
+		if err := bc.db.SaveBlock(genesisBlock); err != nil {
 			return nil, fmt.Errorf("save genesis block: %w", err)
 		}
+
+		bc.tail = genesisBlock
 	}
 
 	return &bc, nil
 }
 
 func (bc *Blockchain) AddBlock(data []byte) error {
-	newBlock, err := NewBlock(data, bc.lastBlock())
+	newBlock, err := types.NewBlock(bc.cons, data, bc.lastBlock())
 	if err != nil {
 		return fmt.Errorf("create new block: %w", err)
 	}
@@ -55,32 +66,29 @@ func (bc *Blockchain) AddBlock(data []byte) error {
 		return fmt.Errorf("save new block %d: %w", newBlock.Number, err)
 	}
 
+	log.Println("add new block", newBlock.Number)
 	return nil
 }
 
-func (bc *Blockchain) saveNewBlock(block *Block) error {
-	data, err := block.Serialize()
-	if err != nil {
-		return fmt.Errorf("serialize: %w", err)
-	}
-
-	if err = bc.db.PutByHash(block.Hash, data); err != nil {
-		return fmt.Errorf("block: %w", err)
-	}
-
-	if err = bc.db.UpdateLastBlockHash(block.Hash); err != nil {
-		return fmt.Errorf("last block hash: %w", err)
-	}
-
+func (bc *Blockchain) saveNewBlock(block *types.Block) error {
 	bc.mu.Lock()
-	bc.tail = block
-	bc.mu.Unlock()
+	defer bc.mu.Unlock()
 
+	if bc.tail.Hash != block.PrevBlockHash {
+		return fmt.Errorf("parent: %d, block: %d: %w",
+			bc.tail.Number, block.Number, ErrInvalidParentBlock)
+	}
+
+	if err := bc.db.SaveBlock(block); err != nil {
+		return err
+	}
+
+	bc.tail = block
 	return nil
 }
 
 // copy value
-func (bc *Blockchain) lastBlock() *Block {
+func (bc *Blockchain) lastBlock() *types.Block {
 	bc.mu.RLock()
 	block := *bc.tail
 	bc.mu.RUnlock()

@@ -1,9 +1,7 @@
-package chain
+package types
 
 import (
 	"fmt"
-	"path2perpetuity/blockchain/core/common"
-	"path2perpetuity/blockchain/core/consensus/pow"
 	"path2perpetuity/blockchain/core/pb"
 	"time"
 
@@ -16,11 +14,11 @@ type Block struct {
 	Number    int64
 
 	Data          []byte
-	PrevBlockHash common.Hash
-	Hash          common.Hash
+	PrevBlockHash Hash
+	Hash          Hash
 }
 
-func NewBlock(data []byte, prevBlock *Block) (block *Block, err error) {
+func NewBlock(cons ConsesusProtocol, data []byte, prevBlock *Block) (block *Block, err error) {
 
 	block = &Block{
 		Timestamp:     time.Now().Unix(),
@@ -29,8 +27,7 @@ func NewBlock(data []byte, prevBlock *Block) (block *Block, err error) {
 		PrevBlockHash: prevBlock.Hash,
 	}
 
-	block.Nonce, block.Hash, err = pow.Run(data)
-	if err != nil {
+	if err = cons.Run(block); err != nil {
 		return nil, fmt.Errorf("Proof-Of-Work: %w", err)
 	}
 
@@ -39,8 +36,8 @@ func NewBlock(data []byte, prevBlock *Block) (block *Block, err error) {
 
 var genesisData = []byte("Genesis")
 
-func NewGenesisBlock() (*Block, error) {
-	return NewBlock(genesisData, &Block{Number: -1})
+func NewGenesisBlock(cons ConsesusProtocol) (*Block, error) {
+	return NewBlock(cons, genesisData, &Block{Number: -1})
 }
 
 func (b *Block) Serialize() ([]byte, error) {
@@ -67,7 +64,7 @@ func DeserializeBlock(data []byte) (*Block, error) {
 		Nonce:         pbBlock.Nonce,
 		Number:        pbBlock.Number,
 		Data:          pbBlock.Data,
-		PrevBlockHash: common.HashFromSlice(pbBlock.PrevBlockHash),
-		Hash:          common.HashFromSlice(pbBlock.Hash),
+		PrevBlockHash: HashFromSlice(pbBlock.PrevBlockHash),
+		Hash:          HashFromSlice(pbBlock.Hash),
 	}, nil
 }

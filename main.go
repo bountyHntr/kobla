@@ -3,10 +3,16 @@ package main
 import (
 	"log"
 	"path2perpetuity/blockchain/core/chain"
+	"path2perpetuity/blockchain/core/consensus/pow"
 )
 
 func main() {
-	bc, err := chain.New()
+	cfg := chain.Config{
+		DBPath:    "./.data",
+		Consensus: pow.New(),
+	}
+
+	bc, err := chain.New(&cfg)
 	if err != nil {
 		log.Fatalf("create blockchian: %s", err)
 	}

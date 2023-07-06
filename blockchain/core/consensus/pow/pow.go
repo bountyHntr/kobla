@@ -1,49 +1,68 @@
 package pow
 
 import (
-	"encoding/binary"
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"path2perpetuity/blockchain/core/common"
+	"path2perpetuity/blockchain/core/types"
 )
 
-var ErrNonceNotFound = errors.New("nonce not found")
+var (
+	ErrNonceNotFound     = errors.New("nonce not found")
+	ErrBlockAlreadyMined = errors.New("block already mined")
+)
 
 const (
 	targetBits = 24
 	maxNonce   = math.MaxUint64
 )
 
-var target = new(big.Int).Lsh(common.BigOne, common.HashBits-targetBits)
+var target = new(big.Int).Lsh(common.BigOne, types.HashBits-targetBits)
 
-func Run(data []byte) (uint64, common.Hash, error) {
-	var nonce uint64
+type ProofOfWork struct{}
 
-	for nonce < maxNonce {
-		hash := common.CalculateHash(appendNonceBytes(data, nonce))
+func New() *ProofOfWork {
+	return &ProofOfWork{}
+}
 
-		if hashIsValid(hash) {
-			return nonce, hash, nil
-		}
+var _ types.ConsesusProtocol = ProofOfWork{}
 
-		nonce++
+// updates the state of the block
+func (ProofOfWork) Run(block *types.Block) error {
+	if block.Nonce != 0 {
+		return ErrBlockAlreadyMined
 	}
 
-	return 0, common.EmptyHash, ErrNonceNotFound
+	for block.Nonce < maxNonce {
+		data, err := block.Serialize()
+		if err != nil {
+			return fmt.Errorf("serialize block: %w", err)
+		}
+
+		hash := types.NewHash(data)
+
+		if hashIsValid(hash) {
+			return nil
+		}
+
+		block.Nonce++
+	}
+
+	return ErrNonceNotFound
 }
 
-func Validate(data []byte, nonce uint64) bool {
-	return hashIsValid(common.CalculateHash(appendNonceBytes(data, nonce)))
+func (ProofOfWork) Validate(block *types.Block) bool {
+	data, err := block.Serialize()
+	if err != nil {
+		return false
+	}
+
+	return hashIsValid(types.NewHash(data))
 }
 
-func hashIsValid(hash common.Hash) bool {
+func hashIsValid(hash types.Hash) bool {
 	hashBigInt := new(big.Int).SetBytes(hash[:])
 	return hashBigInt.Cmp(target) < 0
-}
-
-func appendNonceBytes(data []byte, nonce uint64) []byte {
-	nonceBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(nonceBytes, nonce)
-	return append(data, nonceBytes...)
 }
