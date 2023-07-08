@@ -34,10 +34,14 @@ func NewBlock(cons ConsesusProtocol, data []byte, prevBlock *Block) (block *Bloc
 	return block, nil
 }
 
-var genesisData = []byte("Genesis")
+func (b *Block) Copy() *Block {
+	data := make([]byte, len(b.Data))
+	copy(data, b.Data)
 
-func NewGenesisBlock(cons ConsesusProtocol) (*Block, error) {
-	return NewBlock(cons, genesisData, &Block{Number: -1})
+	block := *b
+	block.Data = data
+
+	return &block
 }
 
 func (b *Block) Serialize() ([]byte, error) {
@@ -67,4 +71,8 @@ func DeserializeBlock(data []byte) (*Block, error) {
 		PrevBlockHash: HashFromSlice(pbBlock.PrevBlockHash),
 		Hash:          HashFromSlice(pbBlock.Hash),
 	}, nil
+}
+
+func (b *Block) PrettyPrint() {
+
 }

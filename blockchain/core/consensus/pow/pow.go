@@ -44,6 +44,7 @@ func (ProofOfWork) Run(block *types.Block) error {
 		hash := types.NewHash(data)
 
 		if hashIsValid(hash) {
+			block.Hash = hash
 			return nil
 		}
 

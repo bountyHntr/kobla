@@ -36,21 +36,21 @@ func New(cfg *Config) (*Blockchain, error) {
 		db:   database,
 	}
 
-	if _, err = database.LastBlockHash(); err != nil {
+	hash, err := database.LastBlockHash()
+	if err != nil {
 		if !errors.Is(err, db.ErrNotFound) {
 			return nil, fmt.Errorf("get last block hash: %w", err)
 		}
 
-		genesisBlock, err := types.NewGenesisBlock(cfg.Consensus)
-		if err != nil {
+		if err := bc.addGenesisBlock(); err != nil {
 			return nil, fmt.Errorf("genesis block: %w", err)
 		}
-
-		if err := bc.db.SaveBlock(genesisBlock); err != nil {
-			return nil, fmt.Errorf("save genesis block: %w", err)
+	} else {
+		lastBlock, err := bc.BlockByHash(hash)
+		if err != nil {
+			return nil, fmt.Errorf("get last block: %w", err)
 		}
-
-		bc.tail = genesisBlock
+		bc.tail = lastBlock
 	}
 
 	return &bc, nil
@@ -70,6 +70,13 @@ func (bc *Blockchain) AddBlock(data []byte) error {
 	return nil
 }
 
+var genesisData = []byte("Genesis")
+
+func (bc *Blockchain) addGenesisBlock() error {
+	bc.tail = &types.Block{Number: -1}
+	return bc.AddBlock(genesisData)
+}
+
 func (bc *Blockchain) saveNewBlock(block *types.Block) error {
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
@@ -87,11 +94,10 @@ func (bc *Blockchain) saveNewBlock(block *types.Block) error {
 	return nil
 }
 
-// copy value
 func (bc *Blockchain) lastBlock() *types.Block {
 	bc.mu.RLock()
-	block := *bc.tail
+	block := bc.tail
 	bc.mu.RUnlock()
 
-	return &block
+	return block
 }
