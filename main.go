@@ -1,29 +1,13 @@
 package main
 
 import (
-	"kobla/blockchain/core/chain"
-	"kobla/blockchain/core/consensus/pow"
-	"log"
+	"kobla/blockchain/tui"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
-	cfg := chain.Config{
-		DBPath:    "./.data",
-		Consensus: pow.New(),
+	if err := tui.Run(); err != nil {
+		log.Fatalf("app: %s", err)
 	}
-
-	bc, err := chain.New(&cfg)
-	if err != nil {
-		log.Fatalf("create blockchian: %s", err)
-	}
-
-	block, err := bc.BlockByNumber(2)
-	if err != nil {
-		panic(err)
-	}
-
-	log.Printf("%+v", block)
-
-	// bc.AddBlock([]byte("Send 1 BTC to Ivan"))
-	// bc.AddBlock([]byte("Send 2 more BTC to Ivan"))
 }
