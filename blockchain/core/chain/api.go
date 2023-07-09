@@ -3,7 +3,7 @@ package chain
 import (
 	"errors"
 	"fmt"
-	"path2perpetuity/blockchain/core/types"
+	"kobla/blockchain/core/types"
 )
 
 var ErrInvalidBlockNumber = errors.New("invalid block number")

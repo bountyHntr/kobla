@@ -2,7 +2,7 @@ package types
 
 import (
 	"fmt"
-	"path2perpetuity/blockchain/core/pb"
+	"kobla/blockchain/core/pb"
 	"time"
 
 	"google.golang.org/protobuf/proto"

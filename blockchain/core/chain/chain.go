@@ -3,9 +3,9 @@ package chain
 import (
 	"errors"
 	"fmt"
+	"kobla/blockchain/core/db"
+	"kobla/blockchain/core/types"
 	"log"
-	"path2perpetuity/blockchain/core/db"
-	"path2perpetuity/blockchain/core/types"
 	"sync"
 )
 

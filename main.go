@@ -1,9 +1,9 @@
 package main
 
 import (
+	"kobla/blockchain/core/chain"
+	"kobla/blockchain/core/consensus/pow"
 	"log"
-	"path2perpetuity/blockchain/core/chain"
-	"path2perpetuity/blockchain/core/consensus/pow"
 )
 
 func main() {

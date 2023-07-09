@@ -3,8 +3,8 @@ package db
 import (
 	"errors"
 	"fmt"
-	"path2perpetuity/blockchain/core/common"
-	"path2perpetuity/blockchain/core/types"
+	"kobla/blockchain/core/common"
+	"kobla/blockchain/core/types"
 
 	badger "github.com/dgraph-io/badger/v3"
 )

@@ -3,10 +3,10 @@ package pow
 import (
 	"errors"
 	"fmt"
+	"kobla/blockchain/core/common"
+	"kobla/blockchain/core/types"
 	"math"
 	"math/big"
-	"path2perpetuity/blockchain/core/common"
-	"path2perpetuity/blockchain/core/types"
 )
 
 var (
