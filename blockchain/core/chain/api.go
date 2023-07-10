@@ -28,3 +28,12 @@ func (bc *Blockchain) BlockByNumber(number int64) (*types.Block, error) {
 
 	return bc.db.Block(hash)
 }
+
+func (bc *Blockchain) SubscribeNewBlocks(subCh chan *types.Block) SubscriptionID {
+	subCh <- bc.lastBlock().Copy()
+	return bc.blockSubs.subscribe(subCh)
+}
+
+func (bc *Blockchain) UnsubscribeBlocks(id SubscriptionID) {
+	bc.blockSubs.unsubscribe(id)
+}

@@ -7,6 +7,7 @@ import (
 	"kobla/blockchain/core/types"
 
 	badger "github.com/dgraph-io/badger/v3"
+	"github.com/dgraph-io/badger/v3/options"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -18,7 +19,10 @@ type Database struct {
 }
 
 func New(path string) (*Database, error) {
-	opts := badger.DefaultOptions(path).WithLoggingLevel(badger.WARNING)
+	opts := badger.DefaultOptions(path).
+		WithLoggingLevel(badger.WARNING).
+		WithCompression(options.None)
+
 	cli, err := badger.Open(opts)
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)

@@ -73,6 +73,6 @@ func DeserializeBlock(data []byte) (*Block, error) {
 	}, nil
 }
 
-func (b *Block) PrettyPrint() {
-
+func (b *Block) PrettyPrintString() string {
+	return fmt.Sprintf("BlockNumber: %d; Nonce: %d; Timestamp: %d", b.Number, b.Nonce, b.Timestamp)
 }

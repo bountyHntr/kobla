@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"kobla/blockchain/core/db"
 	"kobla/blockchain/core/types"
-	"log"
 	"sync"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var ErrInvalidParentBlock = errors.New("invalid parent block")
@@ -23,18 +24,28 @@ type Blockchain struct {
 
 	tail *types.Block // last block, use getter lastBlock()
 	db   *db.Database
+
+	blockSubs *subscriptionManager[types.Block]
 }
 
 func New(cfg *Config) (*Blockchain, error) {
+	logCtx := log.WithField("service", "blockchain")
+
+	logCtx.Info("sync blockchain")
+	logCtx.Info("init database")
+
 	database, err := db.New(cfg.DBPath)
 	if err != nil {
 		return nil, fmt.Errorf("create db: %w", err)
 	}
 
 	bc := Blockchain{
-		cons: cfg.Consensus,
-		db:   database,
+		cons:      cfg.Consensus,
+		db:        database,
+		blockSubs: newSubscription(),
 	}
+
+	logCtx.Info("get last block")
 
 	hash, err := database.LastBlockHash()
 	if err != nil {
@@ -66,7 +77,7 @@ func (bc *Blockchain) AddBlock(data []byte) error {
 		return fmt.Errorf("save new block %d: %w", newBlock.Number, err)
 	}
 
-	log.Println("add new block", newBlock.Number)
+	bc.blockSubs.notify(newBlock)
 	return nil
 }
 
