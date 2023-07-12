@@ -67,8 +67,8 @@ func New(cfg *Config) (*Blockchain, error) {
 	return &bc, nil
 }
 
-func (bc *Blockchain) AddBlock(data []byte) error {
-	newBlock, err := types.NewBlock(bc.cons, data, bc.lastBlock())
+func (bc *Blockchain) AddBlock(txs []*types.Transaction, coinbase types.Address) error {
+	newBlock, err := types.NewBlock(bc.cons, txs, bc.lastBlock(), coinbase)
 	if err != nil {
 		return fmt.Errorf("create new block: %w", err)
 	}
@@ -79,6 +79,10 @@ func (bc *Blockchain) AddBlock(data []byte) error {
 
 	bc.blockSubs.notify(newBlock)
 	return nil
+}
+
+func (bc *Blockchain) ValidateTx(tx *types.Transaction) bool {
+	return false
 }
 
 var genesisData = []byte("Genesis")

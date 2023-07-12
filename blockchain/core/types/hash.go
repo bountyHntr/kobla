@@ -40,3 +40,7 @@ func HashFromHex(hexData string) (hash Hash) {
 func (h Hash) Hex() string {
 	return hex.EncodeToString(h[:])
 }
+
+func (h Hash) Bytes() []byte {
+	return h[:]
+}

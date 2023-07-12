@@ -9,22 +9,28 @@ import (
 )
 
 type Block struct {
-	Timestamp int64
-	Nonce     uint64
-	Number    int64
-
-	Data          []byte
+	Timestamp     int64
+	Nonce         uint64
+	Number        int64
+	Transactions  []*Transaction
 	PrevBlockHash Hash
 	Hash          Hash
+	Coinbase      Address
 }
 
-func NewBlock(cons ConsesusProtocol, data []byte, prevBlock *Block) (block *Block, err error) {
+func NewBlock(
+	cons ConsesusProtocol,
+	txs []*Transaction,
+	prevBlock *Block,
+	coinbase Address,
+) (block *Block, err error) {
 
 	block = &Block{
 		Timestamp:     time.Now().Unix(),
 		Number:        prevBlock.Number + 1,
-		Data:          data,
+		Transactions:  txs,
 		PrevBlockHash: prevBlock.Hash,
+		Coinbase:      coinbase,
 	}
 
 	if err = cons.Run(block); err != nil {
@@ -35,23 +41,31 @@ func NewBlock(cons ConsesusProtocol, data []byte, prevBlock *Block) (block *Bloc
 }
 
 func (b *Block) Copy() *Block {
-	data := make([]byte, len(b.Data))
-	copy(data, b.Data)
+	txs := make([]*Transaction, 0, len(b.Transactions))
+	for _, tx := range b.Transactions {
+		txs = append(txs, tx.Copy())
+	}
 
-	block := *b
-	block.Data = data
+	blockCopy := *b
+	blockCopy.Transactions = txs
 
-	return &block
+	return &blockCopy
 }
 
 func (b *Block) Serialize() ([]byte, error) {
+	txs := make([]*pb.Transaction, len(b.Transactions))
+	for _, tx := range b.Transactions {
+		txs = append(txs, tx.ToProto())
+	}
+
 	pbBlock := pb.Block{
 		Timestamp:     b.Timestamp,
 		Nonce:         b.Nonce,
 		Number:        b.Number,
-		Data:          b.Data,
-		PrevBlockHash: b.PrevBlockHash[:],
-		Hash:          b.Hash[:],
+		Transactions:  txs,
+		PrevBlockHash: b.PrevBlockHash.Bytes(),
+		Hash:          b.Hash.Bytes(),
+		Coinbase:      b.Coinbase.Bytes(),
 	}
 
 	return proto.Marshal(&pbBlock)
@@ -60,16 +74,27 @@ func (b *Block) Serialize() ([]byte, error) {
 func DeserializeBlock(data []byte) (*Block, error) {
 	var pbBlock pb.Block
 	if err := proto.Unmarshal(data, &pbBlock); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unmarshal block: %w", err)
+	}
+
+	txs := make([]*Transaction, len(pbBlock.Transactions))
+	for _, pbTx := range pbBlock.Transactions {
+		tx, err := TransactionFromProto(pbTx)
+		if err != nil {
+			return nil, fmt.Errorf("tx from proto: %w", err)
+		}
+
+		txs = append(txs, tx)
 	}
 
 	return &Block{
 		Timestamp:     pbBlock.Timestamp,
 		Nonce:         pbBlock.Nonce,
 		Number:        pbBlock.Number,
-		Data:          pbBlock.Data,
+		Transactions:  txs,
 		PrevBlockHash: HashFromSlice(pbBlock.PrevBlockHash),
 		Hash:          HashFromSlice(pbBlock.Hash),
+		Coinbase:      AddressFromBytes(pbBlock.Coinbase),
 	}, nil
 }
 

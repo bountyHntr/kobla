@@ -7,7 +7,16 @@ message Block {
     int64 timestamp = 1;
     uint64 nonce = 2;
     int64 number = 3;
-    bytes data = 4;
+    repeated Transaction transactions = 4;
     bytes prev_block_hash = 5;
     bytes hash = 6;
+    bytes coinbase = 7;
+}
+
+message Transaction {
+    bytes sender = 1;
+    bytes receiver = 2;
+    uint64 amount = 3;
+    bytes data = 4;
+    bytes hash = 5;
 }

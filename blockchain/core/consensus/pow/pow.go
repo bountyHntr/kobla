@@ -64,6 +64,6 @@ func (ProofOfWork) Validate(block *types.Block) bool {
 }
 
 func hashIsValid(hash types.Hash) bool {
-	hashBigInt := new(big.Int).SetBytes(hash[:])
+	hashBigInt := new(big.Int).SetBytes(hash.Bytes())
 	return hashBigInt.Cmp(target) < 0
 }

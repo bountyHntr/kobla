@@ -66,11 +66,11 @@ func (db *Database) SaveBlock(block *types.Block) error {
 			return fmt.Errorf("serialize block: %w", err)
 		}
 
-		if err := txn.Set(block.Hash[:], blockData); err != nil {
+		if err := txn.Set(block.Hash.Bytes(), blockData); err != nil {
 			return fmt.Errorf("save block: %w", err)
 		}
 
-		if err := txn.Set(common.Int64ToBytes(block.Number), block.Hash[:]); err != nil {
+		if err := txn.Set(common.Int64ToBytes(block.Number), block.Hash.Bytes()); err != nil {
 			return fmt.Errorf("save hash by number: %w", err)
 		}
 
@@ -82,7 +82,7 @@ func (db *Database) Block(hash types.Hash) (*types.Block, error) {
 	var data []byte
 
 	err := db.cli.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(hash[:])
+		item, err := txn.Get(hash.Bytes())
 		if err != nil {
 			return fmt.Errorf("get value: %w", err)
 		}
