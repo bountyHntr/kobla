@@ -8,6 +8,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const BlockReward = 10240
+
 type Block struct {
 	Timestamp     int64
 	Nonce         uint64
@@ -53,7 +55,7 @@ func (b *Block) Copy() *Block {
 }
 
 func (b *Block) Serialize() ([]byte, error) {
-	txs := make([]*pb.Transaction, len(b.Transactions))
+	txs := make([]*pb.Transaction, 0, len(b.Transactions))
 	for _, tx := range b.Transactions {
 		txs = append(txs, tx.ToProto())
 	}

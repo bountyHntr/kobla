@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	ErrNotFound       = errors.New("not found")
-	ErrInvalidBalance = errors.New("invalid account balance")
+	ErrNotFound        = errors.New("not found")
+	ErrInvalidBalance  = errors.New("invalid account balance")
+	ErrZeroAddressScam = errors.New("zero address scam")
 )
 
 var lastBlockHashKey = []byte("l")
@@ -95,7 +96,7 @@ func (db *Database) Block(hash types.Hash) (*types.Block, error) {
 	var data []byte
 
 	err := db.cli.View(func(txn *badger.Txn) error {
-		return copyValue(txn, hash.Bytes(), data)
+		return copyValue(txn, hash.Bytes(), &data)
 	})
 
 	if err != nil {
@@ -114,7 +115,7 @@ func (db *Database) TxToBlock(hash types.Hash) (types.Hash, error) {
 	data := make([]byte, types.HashBytes)
 
 	err := db.cli.View(func(txn *badger.Txn) error {
-		return copyValue(txn, hash.Bytes(), data)
+		return copyValue(txn, hash.Bytes(), &data)
 	})
 
 	if err != nil {
@@ -128,7 +129,7 @@ func (db *Database) BlockHash(number int64) (types.Hash, error) {
 	data := make([]byte, types.HashBytes)
 
 	err := db.cli.View(func(txn *badger.Txn) error {
-		return copyValue(txn, common.Int64ToBytes(number), data)
+		return copyValue(txn, common.Int64ToBytes(number), &data)
 	})
 
 	if err != nil {
@@ -142,7 +143,7 @@ func (db *Database) Balance(address types.Address) (uint64, error) {
 	var data []byte
 
 	err := db.cli.View(func(txn *badger.Txn) error {
-		return copyValue(txn, address.Bytes(), data)
+		return copyValue(txn, address.Bytes(), &data)
 	})
 
 	if err != nil {
@@ -154,6 +155,26 @@ func (db *Database) Balance(address types.Address) (uint64, error) {
 	}
 
 	return common.Int64FromBytes[uint64](data), nil
+}
+
+func (db *Database) EstimateTxs(txs []*types.Transaction, coinbase types.Address) error {
+	var fakeErr = errors.New("")
+
+	err := db.cli.Update(func(txn *badger.Txn) error {
+		for _, tx := range txs {
+			if err := executeTx(txn, tx, coinbase); err != nil {
+				return fmt.Errorf("execute tx %s: %w", tx.Hash.Hex(), err)
+			}
+		}
+
+		return fakeErr
+	})
+
+	if errors.Is(err, fakeErr) {
+		return nil
+	}
+
+	return err
 }
 
 func (db *Database) Close() {
@@ -168,6 +189,10 @@ func executeTx(db *badger.Txn, tx *types.Transaction, coinbase types.Address) (e
 			tx.Status = types.TxSuccess
 		}
 	}()
+
+	if tx.Sender == types.ZeroAddress && (tx.Receiver != coinbase || tx.Amount != types.BlockReward) {
+		return ErrZeroAddressScam
+	}
 
 	txCost := tx.Cost()
 
@@ -194,13 +219,13 @@ func checkNotFoundError(err error) error {
 	return err
 }
 
-func copyValue(txn *badger.Txn, key, data []byte) error {
+func copyValue(txn *badger.Txn, key []byte, data *[]byte) error {
 	item, err := txn.Get(key)
 	if err != nil {
 		return fmt.Errorf("get value: %w", err)
 	}
 
-	_, err = item.ValueCopy(data)
+	*data, err = item.ValueCopy(*data)
 	if err != nil {
 		return fmt.Errorf("copy value: %w", err)
 	}
@@ -209,9 +234,21 @@ func copyValue(txn *badger.Txn, key, data []byte) error {
 }
 
 func changeBalance(db *badger.Txn, address types.Address, diff uint64, sign int8) error {
+	if address == types.ZeroAddress {
+		return nil
+	}
+
 	balanceItem, err := db.Get(address.Bytes())
 	if err != nil {
-		return fmt.Errorf("get %s balance: %w", address.Hex(), err)
+		if !errors.Is(err, badger.ErrKeyNotFound) {
+			return fmt.Errorf("get %s balance: %w", address.Hex(), err)
+		}
+
+		if err := db.Set(address.Bytes(), common.Int64ToBytes(types.InitBalance)); err != nil {
+			return fmt.Errorf("set init balance: %w", err)
+		}
+
+		balanceItem, _ = db.Get(address.Bytes())
 	}
 
 	return balanceItem.Value(func(balance []byte) error {

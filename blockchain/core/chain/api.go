@@ -52,6 +52,10 @@ func (bc *Blockchain) TxByHash(txHash types.Hash) (*types.Transaction, error) {
 	return nil, nil
 }
 
+func (bc *Blockchain) Balance(address types.Address) (uint64, error) {
+	return bc.db.Balance(address)
+}
+
 func (bc *Blockchain) SubscribeNewBlocks(subCh chan *types.Block) SubscriptionID {
 	subCh <- bc.lastBlock().Copy()
 	return bc.blockSubs.subscribe(subCh)

@@ -10,8 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const BlockReward = 10240 // 1 KB
-
 var ErrInvalidParentBlock = errors.New("invalid parent block")
 
 type Config struct {
@@ -69,13 +67,18 @@ func New(cfg *Config) (*Blockchain, error) {
 	return &bc, nil
 }
 
-func (bc *Blockchain) AddBlock(txs []*types.Transaction, coinbase types.Address) error {
+func (bc *Blockchain) MineBlock(txs []*types.Transaction, coinbase types.Address) error {
 	coinbaseTx, err := newCoinbaseTx(coinbase)
 	if err != nil {
 		return fmt.Errorf("create coinbase tx: %w", err)
 	}
 
-	newBlock, err := types.NewBlock(bc.cons, append(txs, coinbaseTx), bc.lastBlock(), coinbase)
+	txs = append(txs, coinbaseTx)
+	if err := bc.db.EstimateTxs(txs, coinbase); err != nil {
+		return fmt.Errorf("estimate txs: %w", err)
+	}
+
+	newBlock, err := types.NewBlock(bc.cons, txs, bc.lastBlock(), coinbase)
 	if err != nil {
 		return fmt.Errorf("create new block: %w", err)
 	}
@@ -89,12 +92,12 @@ func (bc *Blockchain) AddBlock(txs []*types.Transaction, coinbase types.Address)
 }
 
 func newCoinbaseTx(coinbase types.Address) (*types.Transaction, error) {
-	return types.NewTransaction(types.ZeroAddress, coinbase, BlockReward, []byte("coinbase"))
+	return types.NewTransaction(types.ZeroAddress, coinbase, types.BlockReward, []byte("coinbase"))
 }
 
 func (bc *Blockchain) addGenesisBlock() error {
 	bc.tail = &types.Block{Number: -1}
-	return bc.AddBlock(nil, types.ZeroAddress)
+	return bc.MineBlock(nil, types.ZeroAddress)
 }
 
 func (bc *Blockchain) saveNewBlock(block *types.Block) error {
