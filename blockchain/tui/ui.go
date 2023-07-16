@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"kobla/blockchain/core/chain"
 	"kobla/blockchain/core/types"
-	"log"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"

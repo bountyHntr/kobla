@@ -4,8 +4,6 @@ import (
 	"kobla/blockchain/core/chain"
 	"kobla/blockchain/core/consensus/pow"
 	"kobla/blockchain/tui"
-	"strconv"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -23,15 +21,7 @@ func main() {
 		log.Fatalf("new blockchain: %s", err)
 	}
 
-	go func() {
-		for i := 0; i < 100; i++ {
-			if err := bc.AddBlock([]byte(strconv.Itoa(i))); err != nil {
-				log.Fatalf("add block: %s", err)
-			}
-
-			time.Sleep(time.Second)
-		}
-	}()
+	// TODO: add blocks
 
 	log.Info("run")
 

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"kobla/blockchain/core/types"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var ErrInvalidBlockNumber = errors.New("invalid block number")
@@ -27,6 +29,27 @@ func (bc *Blockchain) BlockByNumber(number int64) (*types.Block, error) {
 	}
 
 	return bc.db.Block(hash)
+}
+
+func (bc *Blockchain) TxByHash(txHash types.Hash) (*types.Transaction, error) {
+	blockHash, err := bc.db.TxToBlock(txHash)
+	if err != nil {
+		return nil, fmt.Errorf("get block by tx hash: %w", err)
+	}
+
+	block, err := bc.BlockByHash(blockHash)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, tx := range block.Transactions {
+		if tx.Hash == txHash {
+			return tx, nil
+		}
+	}
+
+	log.Panicf("inconsistent state")
+	return nil, nil
 }
 
 func (bc *Blockchain) SubscribeNewBlocks(subCh chan *types.Block) SubscriptionID {

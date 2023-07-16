@@ -9,12 +9,20 @@ import (
 
 const byteCost = 10
 
+type TxStatus int32
+
+const (
+	TxFail TxStatus = iota
+	TxSuccess
+)
+
 type Transaction struct {
 	Sender   Address
 	Receiver Address
 	Amount   uint64
 	Data     []byte
 	Hash     Hash
+	Status   TxStatus
 }
 
 func NewTransaction(from, to Address, amount uint64, data []byte) (*Transaction, error) {
@@ -52,6 +60,7 @@ func (tx *Transaction) ToProto() *pb.Transaction {
 		Amount:   tx.Amount,
 		Data:     tx.Data,
 		Hash:     tx.Hash[:],
+		Status:   pb.TxStatus(tx.Status),
 	}
 }
 
@@ -61,6 +70,7 @@ func TransactionFromProto(pbTx *pb.Transaction) (*Transaction, error) {
 		Receiver: AddressFromBytes(pbTx.Receiver),
 		Data:     pbTx.Data,
 		Hash:     HashFromSlice(pbTx.Hash),
+		Status:   TxStatus(pbTx.Status),
 	}, nil
 }
 

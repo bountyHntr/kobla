@@ -10,7 +10,10 @@ import (
 	"github.com/dgraph-io/badger/v3/options"
 )
 
-var ErrNotFound = errors.New("not found")
+var (
+	ErrNotFound       = errors.New("not found")
+	ErrInvalidBalance = errors.New("invalid account balance")
+)
 
 var lastBlockHashKey = []byte("l")
 
@@ -61,6 +64,16 @@ func (db *Database) SaveBlock(block *types.Block) error {
 			return fmt.Errorf("update last block hash: %w", err)
 		}
 
+		for _, tx := range block.Transactions {
+			if err := executeTx(txn, tx, block.Coinbase); err != nil {
+				return fmt.Errorf("execute %s tx: %w", tx.Hash.Hex(), err)
+			}
+
+			if err := txn.Set(tx.Hash.Bytes(), block.Hash.Bytes()); err != nil {
+				return fmt.Errorf("save reference from tx to block: %w", err)
+			}
+		}
+
 		blockData, err := block.Serialize()
 		if err != nil {
 			return fmt.Errorf("serialize block: %w", err)
@@ -82,17 +95,7 @@ func (db *Database) Block(hash types.Hash) (*types.Block, error) {
 	var data []byte
 
 	err := db.cli.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(hash.Bytes())
-		if err != nil {
-			return fmt.Errorf("get value: %w", err)
-		}
-
-		data, err = item.ValueCopy(nil)
-		if err != nil {
-			return fmt.Errorf("copy value: %w", err)
-		}
-
-		return nil
+		return copyValue(txn, hash.Bytes(), data)
 	})
 
 	if err != nil {
@@ -107,21 +110,11 @@ func (db *Database) Block(hash types.Hash) (*types.Block, error) {
 	return block, nil
 }
 
-func (db *Database) BlockHash(number int64) (types.Hash, error) {
+func (db *Database) TxToBlock(hash types.Hash) (types.Hash, error) {
 	data := make([]byte, types.HashBytes)
 
 	err := db.cli.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(common.Int64ToBytes(number))
-		if err != nil {
-			return fmt.Errorf("get value: %w", err)
-		}
-
-		_, err = item.ValueCopy(data)
-		if err != nil {
-			return fmt.Errorf("copy value: %w", err)
-		}
-
-		return nil
+		return copyValue(txn, hash.Bytes(), data)
 	})
 
 	if err != nil {
@@ -131,8 +124,66 @@ func (db *Database) BlockHash(number int64) (types.Hash, error) {
 	return types.HashFromSlice(data), nil
 }
 
+func (db *Database) BlockHash(number int64) (types.Hash, error) {
+	data := make([]byte, types.HashBytes)
+
+	err := db.cli.View(func(txn *badger.Txn) error {
+		return copyValue(txn, common.Int64ToBytes(number), data)
+	})
+
+	if err != nil {
+		return types.EmptyHash, checkNotFoundError(err)
+	}
+
+	return types.HashFromSlice(data), nil
+}
+
+func (db *Database) Balance(address types.Address) (uint64, error) {
+	var data []byte
+
+	err := db.cli.View(func(txn *badger.Txn) error {
+		return copyValue(txn, address.Bytes(), data)
+	})
+
+	if err != nil {
+		if errors.Is(err, badger.ErrKeyNotFound) {
+			return 0, nil
+		}
+
+		return 0, err
+	}
+
+	return common.Int64FromBytes[uint64](data), nil
+}
+
 func (db *Database) Close() {
 	db.cli.Close()
+}
+
+func executeTx(db *badger.Txn, tx *types.Transaction, coinbase types.Address) (err error) {
+	defer func() {
+		if err != nil {
+			tx.Status = types.TxFail
+		} else {
+			tx.Status = types.TxSuccess
+		}
+	}()
+
+	txCost := tx.Cost()
+
+	if err = changeBalance(db, tx.Sender, txCost+tx.Amount, -1); err != nil {
+		return fmt.Errorf("change sender balance: %w", err)
+	}
+
+	if err = changeBalance(db, tx.Receiver, tx.Amount, 1); err != nil {
+		return fmt.Errorf("change receiver balance: %w", err)
+	}
+
+	if err = changeBalance(db, coinbase, txCost, 1); err != nil {
+		return fmt.Errorf("change coinbase balance: %w", err)
+	}
+
+	return nil
 }
 
 func checkNotFoundError(err error) error {
@@ -141,4 +192,46 @@ func checkNotFoundError(err error) error {
 	}
 
 	return err
+}
+
+func copyValue(txn *badger.Txn, key, data []byte) error {
+	item, err := txn.Get(key)
+	if err != nil {
+		return fmt.Errorf("get value: %w", err)
+	}
+
+	_, err = item.ValueCopy(data)
+	if err != nil {
+		return fmt.Errorf("copy value: %w", err)
+	}
+
+	return nil
+}
+
+func changeBalance(db *badger.Txn, address types.Address, diff uint64, sign int8) error {
+	balanceItem, err := db.Get(address.Bytes())
+	if err != nil {
+		return fmt.Errorf("get %s balance: %w", address.Hex(), err)
+	}
+
+	return balanceItem.Value(func(balance []byte) error {
+		balanceU64 := common.Int64FromBytes[uint64](balance)
+
+		if sign < 0 {
+
+			if diff > balanceU64 {
+				return fmt.Errorf("balance: %d; trying to transfer %d: %w", balanceU64, diff, ErrInvalidBalance)
+			}
+
+			balanceU64 -= diff
+		} else {
+			balanceU64 += diff
+		}
+
+		if err := db.Set(address.Bytes(), common.Int64ToBytes(balanceU64)); err != nil {
+			return fmt.Errorf("save %s balance: %w", address.Hex(), err)
+		}
+
+		return nil
+	})
 }

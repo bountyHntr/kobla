@@ -3,6 +3,8 @@ package types
 import (
 	"crypto/sha256"
 	"encoding/hex"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -21,7 +23,7 @@ func NewHash(data []byte) Hash {
 
 func HashFromSlice(hashData []byte) (hash Hash) {
 	if len(hashData) != HashBytes {
-		panic("invalid hash length")
+		log.Panicf("invalid hash length: %d; %s", len(hashData), string(hashData))
 	}
 
 	copy(hash[:], hashData)
@@ -31,7 +33,7 @@ func HashFromSlice(hashData []byte) (hash Hash) {
 func HashFromHex(hexData string) (hash Hash) {
 	data, err := hex.DecodeString(hexData)
 	if err != nil {
-		panic("invalid hex data")
+		log.Panicf("invalid hex data: %s", hexData)
 	}
 
 	return HashFromSlice(data)

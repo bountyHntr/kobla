@@ -13,10 +13,16 @@ message Block {
     bytes coinbase = 7;
 }
 
+enum TxStatus {
+    Fail = 0;
+    Success = 1;
+}
+
 message Transaction {
     bytes sender = 1;
     bytes receiver = 2;
     uint64 amount = 3;
     bytes data = 4;
     bytes hash = 5;
+    TxStatus status = 6;
 }

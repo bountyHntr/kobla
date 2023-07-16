@@ -10,6 +10,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const BlockReward = 10240 // 1 KB
+
 var ErrInvalidParentBlock = errors.New("invalid parent block")
 
 type Config struct {
@@ -68,7 +70,12 @@ func New(cfg *Config) (*Blockchain, error) {
 }
 
 func (bc *Blockchain) AddBlock(txs []*types.Transaction, coinbase types.Address) error {
-	newBlock, err := types.NewBlock(bc.cons, txs, bc.lastBlock(), coinbase)
+	coinbaseTx, err := newCoinbaseTx(coinbase)
+	if err != nil {
+		return fmt.Errorf("create coinbase tx: %w", err)
+	}
+
+	newBlock, err := types.NewBlock(bc.cons, append(txs, coinbaseTx), bc.lastBlock(), coinbase)
 	if err != nil {
 		return fmt.Errorf("create new block: %w", err)
 	}
@@ -81,15 +88,13 @@ func (bc *Blockchain) AddBlock(txs []*types.Transaction, coinbase types.Address)
 	return nil
 }
 
-func (bc *Blockchain) ValidateTx(tx *types.Transaction) bool {
-	return false
+func newCoinbaseTx(coinbase types.Address) (*types.Transaction, error) {
+	return types.NewTransaction(types.ZeroAddress, coinbase, BlockReward, []byte("coinbase"))
 }
-
-var genesisData = []byte("Genesis")
 
 func (bc *Blockchain) addGenesisBlock() error {
 	bc.tail = &types.Block{Number: -1}
-	return bc.AddBlock(genesisData)
+	return bc.AddBlock(nil, types.ZeroAddress)
 }
 
 func (bc *Blockchain) saveNewBlock(block *types.Block) error {
