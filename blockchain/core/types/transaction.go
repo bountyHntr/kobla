@@ -1,7 +1,9 @@
 package types
 
 import (
+	"bytes"
 	"fmt"
+	"kobla/blockchain/core/common"
 	"kobla/blockchain/core/pb"
 
 	"google.golang.org/protobuf/proto"
@@ -17,27 +19,25 @@ const (
 )
 
 type Transaction struct {
-	Sender   Address
-	Receiver Address
-	Amount   uint64
-	Data     []byte
-	Hash     Hash
-	Status   TxStatus
+	Sender    Address
+	Receiver  Address
+	Amount    uint64
+	Data      []byte
+	Status    TxStatus
+	Hash      Hash
+	Signature []byte
 }
 
-func NewTransaction(from, to Address, amount uint64, data []byte) (*Transaction, error) {
-	tx := Transaction{
+func NewTransaction(from, to Address, amount uint64, data []byte) *Transaction {
+	tx := &Transaction{
 		Sender:   from,
 		Receiver: to,
 		Amount:   amount,
 		Data:     data,
 	}
+	tx.setHash()
 
-	if err := tx.setHash(); err != nil {
-		return nil, err
-	}
-
-	return &tx, nil
+	return tx
 }
 
 func (tx *Transaction) Serialize() ([]byte, error) {
@@ -55,31 +55,34 @@ func DeserializeTx(data []byte) (*Transaction, error) {
 
 func (tx *Transaction) ToProto() *pb.Transaction {
 	return &pb.Transaction{
-		Sender:   tx.Sender.Bytes(),
-		Receiver: tx.Receiver.Bytes(),
-		Amount:   tx.Amount,
-		Data:     tx.Data,
-		Hash:     tx.Hash[:],
-		Status:   pb.TxStatus(tx.Status),
+		Sender:    tx.Sender.Bytes(),
+		Receiver:  tx.Receiver.Bytes(),
+		Amount:    tx.Amount,
+		Data:      tx.Data,
+		Hash:      tx.Hash[:],
+		Status:    pb.TxStatus(tx.Status),
+		Signature: tx.Signature,
 	}
 }
 
 func TransactionFromProto(pbTx *pb.Transaction) (*Transaction, error) {
 	return &Transaction{
-		Sender:   AddressFromBytes(pbTx.Sender),
-		Receiver: AddressFromBytes(pbTx.Receiver),
-		Data:     pbTx.Data,
-		Hash:     HashFromSlice(pbTx.Hash),
-		Status:   TxStatus(pbTx.Status),
+		Sender:    AddressFromBytes(pbTx.Sender),
+		Receiver:  AddressFromBytes(pbTx.Receiver),
+		Data:      pbTx.Data,
+		Hash:      HashFromSlice(pbTx.Hash),
+		Status:    TxStatus(pbTx.Status),
+		Signature: pbTx.Signature,
 	}, nil
 }
 
 func (tx *Transaction) Copy() *Transaction {
-	data := make([]byte, len(tx.Data))
-	copy(data, tx.Data)
-
 	txCopy := *tx
-	txCopy.Data = data
+	txCopy.Data = make([]byte, len(tx.Data))
+	copy(txCopy.Data, tx.Data)
+	txCopy.Signature = make([]byte, len(tx.Signature))
+	copy(txCopy.Signature, tx.Signature)
+
 	return &txCopy
 }
 
@@ -87,12 +90,23 @@ func (tx *Transaction) Cost() uint64 {
 	return uint64(AddressLength*2+8+len(tx.Data)+HashBytes) * byteCost
 }
 
-func (tx *Transaction) setHash() error {
-	data, err := tx.Serialize()
+func (tx *Transaction) WighSignature(signer Account) error {
+	signature, err := signer.Sign(tx.Hash)
 	if err != nil {
-		return fmt.Errorf("serialize tx: %w", err)
+		return err
 	}
 
-	tx.Hash = NewHash(data)
+	tx.Signature = signature
 	return nil
+}
+
+func (tx *Transaction) setHash() {
+	data := bytes.Join([][]byte{
+		tx.Sender.Bytes(),
+		tx.Receiver.Bytes(),
+		common.Int64ToBytes(tx.Amount),
+		tx.Data,
+	}, nil)
+
+	tx.Hash = NewHash(data)
 }

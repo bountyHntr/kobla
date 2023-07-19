@@ -1,7 +1,9 @@
 package types
 
 import (
+	"bytes"
 	"fmt"
+	"kobla/blockchain/core/common"
 	"kobla/blockchain/core/pb"
 	"time"
 
@@ -16,8 +18,8 @@ type Block struct {
 	Number        int64
 	Transactions  []*Transaction
 	PrevBlockHash Hash
-	Hash          Hash
 	Coinbase      Address
+	Hash          Hash
 }
 
 func NewBlock(
@@ -40,6 +42,25 @@ func NewBlock(
 	}
 
 	return block, nil
+}
+
+func (b *Block) SetHash() {
+
+	txs := make([]byte, 0, len(b.Transactions)*HashBytes)
+	for _, tx := range b.Transactions {
+		txs = append(txs, tx.Hash.Bytes()...)
+	}
+
+	data := bytes.Join([][]byte{
+		common.Int64ToBytes(b.Timestamp),
+		common.Int64ToBytes(b.Nonce),
+		common.Int64ToBytes(b.Number),
+		txs,
+		b.PrevBlockHash.Bytes(),
+		b.Coinbase.Bytes(),
+	}, nil)
+
+	b.Hash = NewHash(data)
 }
 
 func (b *Block) Copy() *Block {
@@ -79,7 +100,7 @@ func DeserializeBlock(data []byte) (*Block, error) {
 		return nil, fmt.Errorf("unmarshal block: %w", err)
 	}
 
-	txs := make([]*Transaction, len(pbBlock.Transactions))
+	txs := make([]*Transaction, 0, len(pbBlock.Transactions))
 	for _, pbTx := range pbBlock.Transactions {
 		tx, err := TransactionFromProto(pbTx)
 		if err != nil {

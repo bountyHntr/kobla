@@ -123,8 +123,8 @@ func (tui *TerminalUI) updateLastBlock() {
 
 		for block := range blockSub {
 			fmt.Fprintf(tui.header.Clear(),
-				"[red]ПОСЛЕДНИЙ БЛОК:[white]\n[red]НОМЕР:[white] %d [red]ВРЕМЯ:[white] %s [red]NONCE:[white] %d\n[red]HASH:[white] 0x%s",
-				block.Number, time.Unix(block.Timestamp, 0).String(), block.Nonce, block.Hash.Hex(),
+				"[red]ПОСЛЕДНИЙ БЛОК:[white]\n[red]НОМЕР:[white] %d [red]ВРЕМЯ:[white] %s [red]NONCE:[white] %d\n[red]HASH:[white] %s",
+				block.Number, time.Unix(block.Timestamp, 0).String(), block.Nonce, block.Hash.String(),
 			)
 		}
 	}()

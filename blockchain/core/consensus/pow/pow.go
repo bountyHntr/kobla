@@ -2,7 +2,6 @@ package pow
 
 import (
 	"errors"
-	"fmt"
 	"kobla/blockchain/core/common"
 	"kobla/blockchain/core/types"
 	"math"
@@ -15,7 +14,7 @@ var (
 )
 
 const (
-	targetBits = 24
+	targetBits = 8
 	maxNonce   = math.MaxUint64
 )
 
@@ -36,15 +35,9 @@ func (ProofOfWork) Run(block *types.Block) error {
 	}
 
 	for block.Nonce < maxNonce {
-		data, err := block.Serialize()
-		if err != nil {
-			return fmt.Errorf("serialize block: %w", err)
-		}
+		block.SetHash()
 
-		hash := types.NewHash(data)
-
-		if hashIsValid(hash) {
-			block.Hash = hash
+		if hashIsValid(block.Hash) {
 			return nil
 		}
 

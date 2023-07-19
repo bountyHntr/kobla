@@ -67,7 +67,7 @@ func (db *Database) SaveBlock(block *types.Block) error {
 
 		for _, tx := range block.Transactions {
 			if err := executeTx(txn, tx, block.Coinbase); err != nil {
-				return fmt.Errorf("execute %s tx: %w", tx.Hash.Hex(), err)
+				return fmt.Errorf("execute %s tx: %w", tx.Hash.String(), err)
 			}
 
 			if err := txn.Set(tx.Hash.Bytes(), block.Hash.Bytes()); err != nil {
@@ -157,26 +157,6 @@ func (db *Database) Balance(address types.Address) (uint64, error) {
 	return common.Int64FromBytes[uint64](data), nil
 }
 
-func (db *Database) EstimateTxs(txs []*types.Transaction, coinbase types.Address) error {
-	var fakeErr = errors.New("")
-
-	err := db.cli.Update(func(txn *badger.Txn) error {
-		for _, tx := range txs {
-			if err := executeTx(txn, tx, coinbase); err != nil {
-				return fmt.Errorf("execute tx %s: %w", tx.Hash.Hex(), err)
-			}
-		}
-
-		return fakeErr
-	})
-
-	if errors.Is(err, fakeErr) {
-		return nil
-	}
-
-	return err
-}
-
 func (db *Database) Close() {
 	db.cli.Close()
 }
@@ -200,8 +180,10 @@ func executeTx(db *badger.Txn, tx *types.Transaction, coinbase types.Address) (e
 		return fmt.Errorf("change sender balance: %w", err)
 	}
 
-	if err = changeBalance(db, tx.Receiver, tx.Amount, 1); err != nil {
-		return fmt.Errorf("change receiver balance: %w", err)
+	if tx.Amount > 0 {
+		if err = changeBalance(db, tx.Receiver, tx.Amount, 1); err != nil {
+			return fmt.Errorf("change receiver balance: %w", err)
+		}
 	}
 
 	if err = changeBalance(db, coinbase, txCost, 1); err != nil {
@@ -241,7 +223,7 @@ func changeBalance(db *badger.Txn, address types.Address, diff uint64, sign int8
 	balanceItem, err := db.Get(address.Bytes())
 	if err != nil {
 		if !errors.Is(err, badger.ErrKeyNotFound) {
-			return fmt.Errorf("get %s balance: %w", address.Hex(), err)
+			return fmt.Errorf("get %s balance: %w", address.String(), err)
 		}
 
 		if err := db.Set(address.Bytes(), common.Int64ToBytes(types.InitBalance)); err != nil {
@@ -257,7 +239,7 @@ func changeBalance(db *badger.Txn, address types.Address, diff uint64, sign int8
 		if sign < 0 {
 
 			if diff > balanceU64 {
-				return fmt.Errorf("balance: %d; trying to transfer %d: %w", balanceU64, diff, ErrInvalidBalance)
+				return fmt.Errorf("balance: %d; trying to spend %d: %w", balanceU64, diff, ErrInvalidBalance)
 			}
 
 			balanceU64 -= diff
@@ -266,7 +248,7 @@ func changeBalance(db *badger.Txn, address types.Address, diff uint64, sign int8
 		}
 
 		if err := db.Set(address.Bytes(), common.Int64ToBytes(balanceU64)); err != nil {
-			return fmt.Errorf("save %s balance: %w", address.Hex(), err)
+			return fmt.Errorf("save %s balance: %w", address.String(), err)
 		}
 
 		return nil

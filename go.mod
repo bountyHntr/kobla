@@ -3,6 +3,8 @@ module kobla
 go 1.20
 
 require (
+	github.com/btcsuite/btcutil v1.0.2
+	github.com/ddulesov/gogost v1.0.0
 	github.com/dgraph-io/badger/v3 v3.2103.5
 	github.com/gdamore/tcell/v2 v2.6.0
 	github.com/rivo/tview v0.0.0-20230621164836-6cc0565babaf

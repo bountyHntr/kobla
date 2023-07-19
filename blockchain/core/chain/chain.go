@@ -10,7 +10,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var ErrInvalidParentBlock = errors.New("invalid parent block")
+var (
+	ErrInvalidParentBlock = errors.New("invalid parent block")
+	ErrInvalidTxSignature = errors.New("invalid tx signature")
+)
 
 type Config struct {
 	DBPath    string
@@ -68,16 +71,12 @@ func New(cfg *Config) (*Blockchain, error) {
 }
 
 func (bc *Blockchain) MineBlock(txs []*types.Transaction, coinbase types.Address) error {
-	coinbaseTx, err := newCoinbaseTx(coinbase)
-	if err != nil {
-		return fmt.Errorf("create coinbase tx: %w", err)
+
+	if err := validateTxs(txs); err != nil {
+		return err
 	}
 
-	txs = append(txs, coinbaseTx)
-	if err := bc.db.EstimateTxs(txs, coinbase); err != nil {
-		return fmt.Errorf("estimate txs: %w", err)
-	}
-
+	txs = append(txs, newCoinbaseTx(coinbase))
 	newBlock, err := types.NewBlock(bc.cons, txs, bc.lastBlock(), coinbase)
 	if err != nil {
 		return fmt.Errorf("create new block: %w", err)
@@ -91,7 +90,24 @@ func (bc *Blockchain) MineBlock(txs []*types.Transaction, coinbase types.Address
 	return nil
 }
 
-func newCoinbaseTx(coinbase types.Address) (*types.Transaction, error) {
+func validateTxs(txs []*types.Transaction) error {
+
+	for _, tx := range txs {
+		ok, err := tx.Sender.Verify(tx.Hash, tx.Signature)
+		if err != nil {
+			return fmt.Errorf("verify tx signature: %w", err)
+		}
+
+		if !ok {
+			return fmt.Errorf("verify tx signature: sender: %s, hash: %s: %w",
+				tx.Sender.String(), tx.Hash.String(), ErrInvalidTxSignature)
+		}
+	}
+
+	return nil
+}
+
+func newCoinbaseTx(coinbase types.Address) *types.Transaction {
 	return types.NewTransaction(types.ZeroAddress, coinbase, types.BlockReward, []byte("coinbase"))
 }
 

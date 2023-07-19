@@ -25,4 +25,5 @@ message Transaction {
     bytes data = 4;
     bytes hash = 5;
     TxStatus status = 6;
+    bytes signature = 7;
 }
