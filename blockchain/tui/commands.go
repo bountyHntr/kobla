@@ -2,9 +2,10 @@ package tui
 
 import (
 	"fmt"
+	"strconv"
 
+	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
-	log "github.com/sirupsen/logrus"
 )
 
 func (tui *TerminalUI) addAllCommands() *tview.List {
@@ -15,24 +16,46 @@ func (tui *TerminalUI) addAllCommands() *tview.List {
 }
 
 func (tui *TerminalUI) processBlockByNumberCommand() {
-	tui.app.SetFocus(tui.main)
 
-	// inputField := tview.NewInputField().
-	// 	SetLabel("Введите номер блока: ").
-	// 	SetFieldWidth(15).
-	// 	SetAcceptanceFunc(tview.InputFieldInteger).
-	// 	SetDoneFunc(func(key tcell.Key) {
-	// 		app.Stop()
-	// 	})
+	inputField := tview.NewInputField().
+		SetLabel("ВВЕДИТЕ НОМЕР БЛОКА: ").
+		SetLabelColor(tcell.ColorRed).
+		SetFieldWidth(20).
+		SetFieldBackgroundColor(tcell.ColorBlack).
+		SetAcceptanceFunc(tview.InputFieldInteger)
 
-	block, err := tui.bc.BlockByNumber(-1)
-	if err != nil {
-		log.WithField("command", "block_by_number").
-			WithField("block_number", -1).
-			WithError(err).
-			Error("get block by number")
-		return
-	}
+	inputField.SetBorder(true)
 
-	fmt.Fprint(tui.main.Clear(), block.PrettyPrintString())
+	inputField.SetDoneFunc(func(key tcell.Key) {
+
+		defer tui.mflex.RemoveItem(inputField)
+
+		switch key {
+		case tcell.KeyEsc:
+			tui.app.SetFocus(tui.commands)
+		case tcell.KeyEnter:
+			blockNumStr := inputField.GetText()
+
+			blockNum, err := strconv.ParseInt(blockNumStr, 10, 64)
+			if err != nil {
+				fmt.Fprintf(tui.main.Clear(), "Error: invalid block number: %s: %s",
+					blockNumStr, err)
+				tui.app.SetFocus(tui.commands)
+				return
+			}
+
+			block, err := tui.bc.BlockByNumber(blockNum)
+			if err != nil {
+				fmt.Fprintf(tui.main.Clear(), "Error: can't get block %d: %s", blockNum, err)
+				tui.app.SetFocus(tui.commands)
+				return
+			}
+
+			fmt.Fprint(tui.main.Clear(), block.PrettyPrintString())
+			tui.app.SetFocus(tui.main)
+		}
+	})
+
+	tui.mflex.AddItem(inputField, 0, 1, false)
+	tui.app.SetFocus(inputField)
 }

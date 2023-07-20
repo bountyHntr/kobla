@@ -4,8 +4,7 @@ import (
 	"kobla/blockchain/core/chain"
 	"kobla/blockchain/core/consensus/pow"
 	"kobla/blockchain/tui"
-
-	log "github.com/sirupsen/logrus"
+	"log"
 )
 
 const dbPath = "./.data"
@@ -20,10 +19,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("new blockchain: %s", err)
 	}
-
-	// TODO: add blocks
-
-	log.Info("run")
 
 	if err := tui.Run(bc); err != nil {
 		log.Fatalf("app: %s", err)

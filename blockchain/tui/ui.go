@@ -13,8 +13,9 @@ import (
 )
 
 type TerminalUI struct {
-	bc  *chain.Blockchain
-	app *tview.Application
+	bc    *chain.Blockchain
+	app   *tview.Application
+	mflex *tview.Flex
 
 	header   *tview.TextView
 	commands *tview.List
@@ -22,16 +23,22 @@ type TerminalUI struct {
 	mempool  *tview.List
 }
 
-func Run(bc *chain.Blockchain) error {
+func newTUI(bc *chain.Blockchain) *TerminalUI {
+	return &TerminalUI{
+		bc:    bc,
+		app:   tview.NewApplication(),
+		mflex: tview.NewFlex(),
 
-	tui := &TerminalUI{
-		bc:       bc,
-		app:      tview.NewApplication(),
 		header:   tview.NewTextView(),
 		commands: tview.NewList(),
 		main:     tview.NewTextView(),
 		mempool:  tview.NewList(),
 	}
+}
+
+func Run(bc *chain.Blockchain) error {
+
+	tui := newTUI(bc)
 
 	tui.configureApp()
 	tui.configureHeader()
@@ -51,7 +58,7 @@ func Run(bc *chain.Blockchain) error {
 func (tui *TerminalUI) configureApp() {
 	flex := tview.NewFlex().
 		AddItem(tui.commands, 0, 1, true).
-		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(tui.mflex.SetDirection(tview.FlexRow).
 			AddItem(tui.header, 0, 1, false).
 			AddItem(tui.main, 0, 4, false), 0, 2, false).
 		AddItem(tui.mempool, 0, 1, false)
@@ -88,6 +95,7 @@ func (tui *TerminalUI) configureCommands() {
 	})
 
 	tui.addAllCommands().
+		SetShortcutColor(tcell.ColorRed).
 		SetBorder(true).
 		SetTitle("Commands")
 }
