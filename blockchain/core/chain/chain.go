@@ -16,8 +16,11 @@ var (
 )
 
 type Config struct {
-	DBPath    string
-	Consensus types.ConsesusProtocol
+	DBPath        string
+	Consensus     types.ConsesusProtocol
+	SyncNode      string
+	Miner         bool
+	MinderAddress string
 }
 
 type Blockchain struct {
@@ -25,8 +28,10 @@ type Blockchain struct {
 
 	cons types.ConsesusProtocol
 
-	tail *types.Block // last block, use getter lastBlock()
-	db   *db.Database
+	tail    *types.Block // last block, use getter lastBlock()
+	db      *db.Database
+	mempool *memoryPool
+	comm    *communicationManager
 
 	blockSubs *subscriptionManager[types.Block]
 }
@@ -43,12 +48,15 @@ func New(cfg *Config) (*Blockchain, error) {
 	}
 
 	bc := Blockchain{
-		cons:      cfg.Consensus,
-		db:        database,
-		blockSubs: newSubscription(),
+		cons: cfg.Consensus,
+
+		db:      database,
+		mempool: newMempool(),
+
+		blockSubs: newSubscription[types.Block](),
 	}
 
-	logCtx.Info("get last block")
+	bc.comm = newCommunicationManager(cfg.SyncNode, &bc)
 
 	hash, err := database.LastBlockHash()
 	if err != nil {
@@ -66,6 +74,8 @@ func New(cfg *Config) (*Blockchain, error) {
 		}
 		bc.tail = lastBlock
 	}
+
+	bc.comm.listen()
 
 	return &bc, nil
 }

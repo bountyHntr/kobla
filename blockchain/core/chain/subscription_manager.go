@@ -11,13 +11,13 @@ type Copier[T any] interface {
 
 type SubscriptionID int
 
-type subscriptionManager[T types.Block] struct {
+type subscriptionManager[T types.Block | types.Transaction] struct {
 	mu   sync.RWMutex
 	subs map[SubscriptionID]chan *T
 	id   SubscriptionID
 }
 
-func newSubscription[T types.Block]() *subscriptionManager[T] {
+func newSubscription[T types.Block | types.Transaction]() *subscriptionManager[T] {
 	return &subscriptionManager[T]{
 		subs: make(map[SubscriptionID]chan *T),
 	}

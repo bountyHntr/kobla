@@ -27,3 +27,8 @@ message Transaction {
     TxStatus status = 6;
     bytes signature = 7;
 }
+
+message ChainStatus {
+   int64 height = 1;
+   string address_from = 2;
+}

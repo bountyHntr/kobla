@@ -56,6 +56,10 @@ func (bc *Blockchain) Balance(address types.Address) (uint64, error) {
 	return bc.db.Balance(address)
 }
 
+func (bc *Blockchain) TopMempoolTxs(n int) []*types.Transaction {
+	return bc.mempool.top(n)
+}
+
 func (bc *Blockchain) SubscribeNewBlocks(subCh chan *types.Block) SubscriptionID {
 	subCh <- bc.lastBlock().Copy()
 	return bc.blockSubs.subscribe(subCh)
