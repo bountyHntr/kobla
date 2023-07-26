@@ -8,15 +8,16 @@ func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
-	_ = x[commandSync-0]
-	_ = x[commandGetBlock-1]
-	_ = x[commandSendBlock-2]
-	_ = x[commandSendTx-3]
+	_ = x[commandResponse-0]
+	_ = x[commandSync-1]
+	_ = x[commandGetBlock-2]
+	_ = x[commandSendBlock-3]
+	_ = x[commandSendTx-4]
 }
 
-const _Command_name = "commandSynccommandGetBlockcommandSendBlockcommandSendTx"
+const _Command_name = "commandResponsecommandSynccommandGetBlockcommandSendBlockcommandSendTx"
 
-var _Command_index = [...]uint8{0, 11, 26, 42, 55}
+var _Command_index = [...]uint8{0, 15, 26, 41, 57, 70}
 
 func (i Command) String() string {
 	if i < 0 || i >= Command(len(_Command_index)-1) {

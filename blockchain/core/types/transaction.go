@@ -69,6 +69,7 @@ func TransactionFromProto(pbTx *pb.Transaction) (*Transaction, error) {
 	return &Transaction{
 		Sender:    AddressFromBytes(pbTx.Sender),
 		Receiver:  AddressFromBytes(pbTx.Receiver),
+		Amount:    pbTx.Amount,
 		Data:      pbTx.Data,
 		Hash:      HashFromSlice(pbTx.Hash),
 		Status:    TxStatus(pbTx.Status),
@@ -90,7 +91,7 @@ func (tx *Transaction) Cost() uint64 {
 	return uint64(AddressLength*2+8+len(tx.Data)+HashBytes) * byteCost
 }
 
-func (tx *Transaction) WighSignature(signer Account) error {
+func (tx *Transaction) WithSignature(signer Account) error {
 	signature, err := signer.Sign(tx.Hash)
 	if err != nil {
 		return err

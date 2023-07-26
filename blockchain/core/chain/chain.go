@@ -11,16 +11,21 @@ import (
 )
 
 var (
-	ErrInvalidParentBlock = errors.New("invalid parent block")
-	ErrInvalidTxSignature = errors.New("invalid tx signature")
+	ErrInvalidParentBlock  = errors.New("invalid parent block")
+	ErrInvalidTxSignature  = errors.New("invalid tx signature")
+	ErrZeroAddressScam     = errors.New("zero address scam")
+	ErrDuplicateCoinbaseTx = errors.New("duplicate coinbase tx")
+	ErrNoCoinbaseTx        = errors.New("no coinbase tx")
 )
 
 type Config struct {
-	DBPath        string
-	Consensus     types.ConsesusProtocol
-	SyncNode      string
-	Miner         bool
-	MinderAddress string
+	DBPath          string
+	Consensus       types.ConsesusProtocol
+	URL             string
+	SyncNode        string
+	Miner           bool
+	CoinbaseAddress string
+	Genesis         bool
 }
 
 type Blockchain struct {
@@ -37,10 +42,7 @@ type Blockchain struct {
 }
 
 func New(cfg *Config) (*Blockchain, error) {
-	logCtx := log.WithField("service", "blockchain")
-
-	logCtx.Info("sync blockchain")
-	logCtx.Info("init database")
+	log.Info("init database")
 
 	database, err := db.New(cfg.DBPath)
 	if err != nil {
@@ -56,7 +58,7 @@ func New(cfg *Config) (*Blockchain, error) {
 		blockSubs: newSubscription[types.Block](),
 	}
 
-	bc.comm = newCommunicationManager(cfg.SyncNode, &bc)
+	bc.comm = newCommunicationManager(cfg.URL, cfg.SyncNode, &bc)
 
 	hash, err := database.LastBlockHash()
 	if err != nil {
@@ -64,8 +66,12 @@ func New(cfg *Config) (*Blockchain, error) {
 			return nil, fmt.Errorf("get last block hash: %w", err)
 		}
 
-		if err := bc.addGenesisBlock(); err != nil {
-			return nil, fmt.Errorf("genesis block: %w", err)
+		bc.tail = &types.Block{Number: -1}
+
+		if cfg.Genesis {
+			if err := bc.addGenesisBlock(); err != nil {
+				return nil, fmt.Errorf("genesis block: %w", err)
+			}
 		}
 	} else {
 		lastBlock, err := bc.BlockByHash(hash)
@@ -75,18 +81,20 @@ func New(cfg *Config) (*Blockchain, error) {
 		bc.tail = lastBlock
 	}
 
-	bc.comm.listen()
+	if err := bc.comm.listen(); err != nil {
+		return nil, fmt.Errorf("run listener: %w", err)
+	}
 
 	return &bc, nil
 }
 
 func (bc *Blockchain) MineBlock(txs []*types.Transaction, coinbase types.Address) error {
 
-	if err := validateTxs(txs); err != nil {
+	txs = append(txs, newCoinbaseTx(coinbase))
+	if err := validateTxs(txs, coinbase); err != nil {
 		return err
 	}
 
-	txs = append(txs, newCoinbaseTx(coinbase))
 	newBlock, err := types.NewBlock(bc.cons, txs, bc.lastBlock(), coinbase)
 	if err != nil {
 		return fmt.Errorf("create new block: %w", err)
@@ -100,9 +108,39 @@ func (bc *Blockchain) MineBlock(txs []*types.Transaction, coinbase types.Address
 	return nil
 }
 
-func validateTxs(txs []*types.Transaction) error {
+func (bc *Blockchain) addBlock(block *types.Block) error {
 
+	if err := validateTxs(block.Transactions, block.Coinbase); err != nil {
+		return err
+	}
+
+	if err := bc.saveNewBlock(block); err != nil {
+		return fmt.Errorf("save new block %d: %w", block.Number, err)
+	}
+
+	bc.blockSubs.notify(block)
+	return nil
+}
+
+func validateTxs(txs []*types.Transaction, coinbase types.Address) error {
+	hasCoinbase := false
 	for _, tx := range txs {
+
+		if tx.Sender == types.ZeroAddress {
+			if tx.Receiver != coinbase {
+				return fmt.Errorf("verify coinbase tx receiver: hash: %s: %w",
+					tx.Hash.String(), ErrZeroAddressScam)
+			}
+
+			if hasCoinbase {
+				return fmt.Errorf("verify number of coinbase txs: hash %s: %w",
+					tx.Hash.String(), ErrDuplicateCoinbaseTx)
+			}
+
+			hasCoinbase = true
+			continue
+		}
+
 		ok, err := tx.Sender.Verify(tx.Hash, tx.Signature)
 		if err != nil {
 			return fmt.Errorf("verify tx signature: %w", err)
@@ -114,6 +152,10 @@ func validateTxs(txs []*types.Transaction) error {
 		}
 	}
 
+	if !hasCoinbase {
+		return ErrNoCoinbaseTx
+	}
+
 	return nil
 }
 
@@ -122,7 +164,6 @@ func newCoinbaseTx(coinbase types.Address) *types.Transaction {
 }
 
 func (bc *Blockchain) addGenesisBlock() error {
-	bc.tail = &types.Block{Number: -1}
 	return bc.MineBlock(nil, types.ZeroAddress)
 }
 
