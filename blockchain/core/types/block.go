@@ -22,7 +22,10 @@ type Block struct {
 	Hash          Hash
 }
 
-var _ Serializable = &Block{}
+var (
+	_ Serializable  = &Block{}
+	_ Copier[Block] = &Block{}
+)
 
 func NewBlock(
 	cons ConsesusProtocol,
@@ -121,8 +124,4 @@ func DeserializeBlock(data []byte) (*Block, error) {
 		Hash:          HashFromSlice(pbBlock.Hash),
 		Coinbase:      AddressFromBytes(pbBlock.Coinbase),
 	}, nil
-}
-
-func (b *Block) PrettyPrintString() string {
-	return fmt.Sprintf("BlockNumber: %d; Nonce: %d; Timestamp: %d", b.Number, b.Nonce, b.Timestamp)
 }

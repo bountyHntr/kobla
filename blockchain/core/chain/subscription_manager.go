@@ -5,19 +5,15 @@ import (
 	"sync"
 )
 
-type Copier[T any] interface {
-	Copy() *T
-}
-
 type SubscriptionID int
 
-type subscriptionManager[T types.Block | types.Transaction] struct {
+type subscriptionManager[T types.Block | types.Transaction | types.Void] struct {
 	mu   sync.RWMutex
 	subs map[SubscriptionID]chan *T
 	id   SubscriptionID
 }
 
-func newSubscription[T types.Block | types.Transaction]() *subscriptionManager[T] {
+func newSubscription[T types.Block | types.Transaction | types.Void]() *subscriptionManager[T] {
 	return &subscriptionManager[T]{
 		subs: make(map[SubscriptionID]chan *T),
 	}
@@ -39,7 +35,7 @@ func (s *subscriptionManager[T]) unsubscribe(id SubscriptionID) {
 	s.mu.Unlock()
 }
 
-func (s *subscriptionManager[T]) notify(value Copier[T]) {
+func (s *subscriptionManager[T]) notify(value types.Copier[T]) {
 	s.mu.RLock()
 	for _, ch := range s.subs {
 		select {

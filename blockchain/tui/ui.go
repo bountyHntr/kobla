@@ -20,7 +20,7 @@ type TerminalUI struct {
 	header   *tview.TextView
 	commands *tview.List
 	main     *tview.TextView
-	mempool  *tview.List
+	mempool  *tview.TextView
 }
 
 func newTUI(bc *chain.Blockchain) *TerminalUI {
@@ -32,7 +32,7 @@ func newTUI(bc *chain.Blockchain) *TerminalUI {
 		header:   tview.NewTextView(),
 		commands: tview.NewList(),
 		main:     tview.NewTextView(),
-		mempool:  tview.NewList(),
+		mempool:  tview.NewTextView(),
 	}
 }
 
@@ -47,6 +47,7 @@ func Run(bc *chain.Blockchain) error {
 	tui.configureMempool()
 
 	tui.updateLastBlock()
+	tui.updateMempool()
 
 	if err := tui.run(); err != nil {
 		return fmt.Errorf("run app: %w", err)
@@ -83,11 +84,13 @@ func (tui *TerminalUI) configureHeader() {
 
 func (tui *TerminalUI) configureCommands() {
 
-	tui.commands.SetSelectedFunc(func(_ int, command, _ string, _ rune) {
-		switch command {
-		case "block_by_number":
+	tui.commands.SetSelectedFunc(func(idx int, command string, _ string, _ rune) {
+		switch Command(idx) {
+		case blockByNumber:
 			tui.processBlockByNumberCommand()
-		case "quit":
+		case blockByHash:
+			tui.processBlockByHashCommand()
+		case quit:
 			tui.app.Stop()
 		default:
 			log.Panicf("invalid command %s", command)
@@ -111,11 +114,20 @@ func (tui *TerminalUI) configureMain() {
 		}
 	})
 
-	tui.main.SetBorder(true)
+	tui.main.
+		SetDynamicColors(true).
+		SetBorder(true)
 }
 
 func (tui *TerminalUI) configureMempool() {
-	tui.mempool.SetBorder(true).SetTitle("Mempool")
+	tui.mempool.SetChangedFunc(func() {
+		tui.app.Draw()
+	})
+
+	tui.mempool.
+		SetDynamicColors(true).
+		SetBorder(true).
+		SetTitle("Mempool")
 }
 
 func (tui *TerminalUI) run() error {
@@ -131,9 +143,29 @@ func (tui *TerminalUI) updateLastBlock() {
 
 		for block := range blockSub {
 			fmt.Fprintf(tui.header.Clear(),
-				"[red]ПОСЛЕДНИЙ БЛОК:[white]\n[red]НОМЕР:[white] %d [red]ВРЕМЯ:[white] %s [red]NONCE:[white] %d\n[red]HASH:[white] %s",
+				"[red]ПОСЛЕДНИЙ БЛОК:[white]\n[red]НОМЕР:[white] %d [red]ВРЕМЯ:[white] %s [red]NONCE:[white] %d\n[red]ХЕШ:[white] %s",
 				block.Number, time.Unix(block.Timestamp, 0).String(), block.Nonce, block.Hash.String(),
 			)
+		}
+	}()
+}
+
+func (tui *TerminalUI) updateMempool() {
+	const topN = 20
+
+	go func() {
+		updates := make(chan *types.Void, 1)
+
+		subID := tui.bc.SubscribeMempoolUpdates(updates)
+		defer tui.bc.UnsubscribeMempoolUpdates(subID)
+
+		for range updates {
+			txs := tui.bc.TopMempoolTxs(topN)
+			tui.mempool.Clear()
+
+			for i, tx := range txs {
+				fmt.Fprintf(tui.mempool, "[red](%d)[white] %s\n", i+1, tx.Hash.String())
+			}
 		}
 	}()
 }

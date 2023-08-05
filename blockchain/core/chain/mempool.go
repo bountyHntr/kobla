@@ -14,12 +14,14 @@ type memoryPool struct {
 	mu         sync.RWMutex
 	orderedTxs *list.List
 	txs        map[types.Hash]*list.Element
+	subs       *subscriptionManager[types.Void]
 }
 
 func newMempool() *memoryPool {
 	return &memoryPool{
 		orderedTxs: list.New(),
 		txs:        make(map[types.Hash]*list.Element, defaultMempoolCap),
+		subs:       newSubscription[types.Void](),
 	}
 }
 
@@ -60,6 +62,7 @@ func (mp *memoryPool) add(tx *types.Transaction) bool {
 	}
 
 	mp.txs[tx.Hash] = txElement
+	mp.subs.notify(types.Void{})
 	return true
 }
 
@@ -74,6 +77,7 @@ func (mp *memoryPool) remove(hash types.Hash) {
 
 	mp.orderedTxs.Remove(txElement)
 	delete(mp.txs, hash)
+	mp.subs.notify(types.Void{})
 }
 
 func (mp *memoryPool) size() int {
@@ -86,8 +90,13 @@ func (mp *memoryPool) size() int {
 
 func (mp *memoryPool) top(n int) (txs []*types.Transaction) {
 	mp.mu.RLock()
+	defer mp.mu.RUnlock()
 
 	tx := mp.orderedTxs.Front()
+	if tx == nil {
+		return
+	}
+
 	for i := 0; i < n; i++ {
 		txs = append(txs, tx.Value.(*types.Transaction))
 
@@ -96,7 +105,13 @@ func (mp *memoryPool) top(n int) (txs []*types.Transaction) {
 		}
 	}
 
-	mp.mu.RUnlock()
-
 	return
+}
+
+func (mp *memoryPool) subscribeUpdates(subCh chan *types.Void) SubscriptionID {
+	return mp.subs.subscribe(subCh)
+}
+
+func (mp *memoryPool) unsubscribeUpdates(id SubscriptionID) {
+	mp.subs.unsubscribe(id)
 }

@@ -23,12 +23,11 @@ var (
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Config struct {
-	DBPath          string
-	Consensus       types.ConsesusProtocol
-	URL             string
-	SyncNode        string
-	CoinbaseAddress string
-	Genesis         bool
+	DBPath    string
+	Consensus types.ConsesusProtocol
+	URL       string
+	SyncNode  string
+	Genesis   bool
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

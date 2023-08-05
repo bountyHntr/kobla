@@ -28,7 +28,10 @@ type Transaction struct {
 	Signature []byte
 }
 
-var _ Serializable = &Transaction{}
+var (
+	_ Serializable        = &Transaction{}
+	_ Copier[Transaction] = &Transaction{}
+)
 
 func NewTransaction(from, to Address, amount uint64, data []byte) *Transaction {
 	tx := &Transaction{

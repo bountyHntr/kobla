@@ -92,4 +92,12 @@ func (bc *Blockchain) UnsubscribeBlocks(id SubscriptionID) {
 	bc.blockSubs.unsubscribe(id)
 }
 
+func (bc *Blockchain) SubscribeMempoolUpdates(subCh chan *types.Void) SubscriptionID {
+	return bc.mempool.subscribeUpdates(subCh)
+}
+
+func (bc *Blockchain) UnsubscribeMempoolUpdates(id SubscriptionID) {
+	bc.mempool.unsubscribeUpdates(id)
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
