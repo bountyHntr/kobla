@@ -10,6 +10,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 var (
 	ErrInvalidParentBlock  = errors.New("invalid parent block")
 	ErrInvalidTxSignature  = errors.New("invalid tx signature")
@@ -18,15 +20,18 @@ var (
 	ErrNoCoinbaseTx        = errors.New("no coinbase tx")
 )
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 type Config struct {
 	DBPath          string
 	Consensus       types.ConsesusProtocol
 	URL             string
 	SyncNode        string
-	Miner           bool
 	CoinbaseAddress string
 	Genesis         bool
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Blockchain struct {
 	mu sync.RWMutex
@@ -40,6 +45,8 @@ type Blockchain struct {
 
 	blockSubs *subscriptionManager[types.Block]
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func New(cfg *Config) (*Blockchain, error) {
 	log.Info("init database")
@@ -88,7 +95,9 @@ func New(cfg *Config) (*Blockchain, error) {
 	return &bc, nil
 }
 
-func (bc *Blockchain) MineBlock(txs []*types.Transaction, coinbase types.Address) error {
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+func (bc *Blockchain) mineBlock(txs []*types.Transaction, coinbase types.Address) error {
 
 	txs = append(txs, newCoinbaseTx(coinbase))
 	if err := validateTxs(txs, coinbase); err != nil {
@@ -100,13 +109,14 @@ func (bc *Blockchain) MineBlock(txs []*types.Transaction, coinbase types.Address
 		return fmt.Errorf("create new block: %w", err)
 	}
 
-	if err = bc.saveNewBlock(newBlock); err != nil {
-		return fmt.Errorf("save new block %d: %w", newBlock.Number, err)
+	if err = bc.newBlock(newBlock); err != nil {
+		return fmt.Errorf("new block %d: %w", newBlock.Number, err)
 	}
 
-	bc.blockSubs.notify(newBlock)
 	return nil
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func (bc *Blockchain) addBlock(block *types.Block) error {
 
@@ -114,11 +124,10 @@ func (bc *Blockchain) addBlock(block *types.Block) error {
 		return err
 	}
 
-	if err := bc.saveNewBlock(block); err != nil {
-		return fmt.Errorf("save new block %d: %w", block.Number, err)
+	if err := bc.newBlock(block); err != nil {
+		return fmt.Errorf("new block %d: %w", block.Number, err)
 	}
 
-	bc.blockSubs.notify(block)
 	return nil
 }
 
@@ -164,7 +173,7 @@ func newCoinbaseTx(coinbase types.Address) *types.Transaction {
 }
 
 func (bc *Blockchain) addGenesisBlock() error {
-	return bc.MineBlock(nil, types.ZeroAddress)
+	return bc.mineBlock(nil, types.ZeroAddress)
 }
 
 func (bc *Blockchain) saveNewBlock(block *types.Block) error {
@@ -184,6 +193,24 @@ func (bc *Blockchain) saveNewBlock(block *types.Block) error {
 	return nil
 }
 
+func (bc *Blockchain) newBlock(block *types.Block) error {
+	if err := bc.saveNewBlock(block); err != nil {
+		return fmt.Errorf("save new block %d: %w", block.Number, err)
+	}
+
+	bc.releaseMempool(block)
+	bc.blockSubs.notify(block)
+	bc.comm.broadcast(block)
+
+	return nil
+}
+
+func (bc *Blockchain) releaseMempool(b *types.Block) {
+	for _, tx := range b.Transactions {
+		bc.mempool.remove(tx.Hash)
+	}
+}
+
 func (bc *Blockchain) lastBlock() *types.Block {
 	bc.mu.RLock()
 	block := bc.tail
@@ -191,3 +218,5 @@ func (bc *Blockchain) lastBlock() *types.Block {
 
 	return block
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////

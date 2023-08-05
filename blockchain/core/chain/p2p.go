@@ -37,8 +37,8 @@ const (
 	commandResponse Command = iota
 	commandSync
 	commandGetBlock
-	commandSendBlock
-	commandSendTx
+	commandNewBlock
+	commandNewTx
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -129,8 +129,10 @@ func (cm *communicationManager) handleConnection(conn net.Conn) {
 		err = cm.handleSync(conn, request)
 	case commandGetBlock:
 		err = cm.handleGetBlock(conn, request)
-	case commandSendBlock:
-	case commandSendTx:
+	case commandNewBlock:
+		err = cm.handleNewBlock(request)
+	case commandNewTx:
+		err = cm.handleNewTx(request)
 	}
 
 	if err != nil {
@@ -180,6 +182,30 @@ func (cm *communicationManager) handleGetBlock(conn net.Conn, request []byte) (e
 	}
 
 	return writeResponse(conn, data)
+}
+
+func (cm *communicationManager) handleNewBlock(data []byte) error {
+	block, err := types.DeserializeBlock(data)
+	if err != nil {
+		return fmt.Errorf("deserialize block: %w", err)
+	}
+
+	if err := cm.bc.addBlock(block); err != nil {
+		return fmt.Errorf("add block: %w", err)
+	}
+
+	return nil
+}
+
+func (cm *communicationManager) handleNewTx(data []byte) error {
+	tx, err := types.DeserializeTx(data)
+	if err != nil {
+		return fmt.Errorf("deserialize tx: %w", err)
+	}
+
+	cm.bc.mempool.add(tx)
+	cm.broadcast(tx)
+	return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -278,6 +304,33 @@ func (cm *communicationManager) chainStatus() *pb.ChainStatus {
 	return &pb.ChainStatus{
 		Height:      cm.bc.lastBlock().Number,
 		AddressFrom: cm.url,
+	}
+}
+
+func (cm *communicationManager) broadcast(msg types.Serializable) {
+	data, _ := msg.Serialize()
+
+	var command Command
+	switch msg.(type) {
+	case *types.Transaction:
+		command = commandNewTx
+	case *types.Block:
+		command = commandNewBlock
+	}
+
+	for node := range cm.knownNodes {
+
+		conn, err := newConnection(node)
+		if err != nil {
+			log.WithField("node", node).WithError(err).Error("new connection")
+			continue
+		}
+
+		if err := write(conn, command, data); err != nil {
+			log.WithField("node", node).WithError(err).Error("send data")
+		}
+
+		conn.Close()
 	}
 }
 

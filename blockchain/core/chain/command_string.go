@@ -11,13 +11,13 @@ func _() {
 	_ = x[commandResponse-0]
 	_ = x[commandSync-1]
 	_ = x[commandGetBlock-2]
-	_ = x[commandSendBlock-3]
-	_ = x[commandSendTx-4]
+	_ = x[commandNewBlock-3]
+	_ = x[commandNewTx-4]
 }
 
-const _Command_name = "commandResponsecommandSynccommandGetBlockcommandSendBlockcommandSendTx"
+const _Command_name = "commandResponsecommandSynccommandGetBlockcommandNewBlockcommandNewTx"
 
-var _Command_index = [...]uint8{0, 15, 26, 41, 57, 70}
+var _Command_index = [...]uint8{0, 15, 26, 41, 56, 68}
 
 func (i Command) String() string {
 	if i < 0 || i >= Command(len(_Command_index)-1) {

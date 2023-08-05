@@ -28,6 +28,8 @@ type Transaction struct {
 	Signature []byte
 }
 
+var _ Serializable = &Transaction{}
+
 func NewTransaction(from, to Address, amount uint64, data []byte) *Transaction {
 	tx := &Transaction{
 		Sender:   from,

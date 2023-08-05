@@ -22,6 +22,8 @@ type Block struct {
 	Hash          Hash
 }
 
+var _ Serializable = &Block{}
+
 func NewBlock(
 	cons ConsesusProtocol,
 	txs []*Transaction,

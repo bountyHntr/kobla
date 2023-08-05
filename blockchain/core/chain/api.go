@@ -8,7 +8,24 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 var ErrInvalidBlockNumber = errors.New("invalid block number")
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+func (bc *Blockchain) MineBlock(txs []*types.Transaction, coibase types.Address) error {
+	return bc.mineBlock(txs, coibase)
+}
+
+func (bc *Blockchain) SendTx(tx *types.Transaction) {
+	if ok := bc.mempool.add(tx); !ok {
+		return
+	}
+	bc.comm.broadcast(tx)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func (bc *Blockchain) BlockByHash(hash types.Hash) (*types.Block, error) {
 	return bc.db.Block(hash)
@@ -60,6 +77,12 @@ func (bc *Blockchain) TopMempoolTxs(n int) []*types.Transaction {
 	return bc.mempool.top(n)
 }
 
+func (bc *Blockchain) MempoolSize() int {
+	return bc.mempool.size()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 func (bc *Blockchain) SubscribeNewBlocks(subCh chan *types.Block) SubscriptionID {
 	subCh <- bc.lastBlock().Copy()
 	return bc.blockSubs.subscribe(subCh)
@@ -68,3 +91,5 @@ func (bc *Blockchain) SubscribeNewBlocks(subCh chan *types.Block) SubscriptionID
 func (bc *Blockchain) UnsubscribeBlocks(id SubscriptionID) {
 	bc.blockSubs.unsubscribe(id)
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////

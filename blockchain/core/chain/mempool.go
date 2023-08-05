@@ -4,12 +4,11 @@ import (
 	"container/list"
 	"kobla/blockchain/core/types"
 	"sync"
+
+	log "github.com/sirupsen/logrus"
 )
 
-const (
-	defaultMempoolCap = 64
-	defaultBlockSize  = 5
-)
+const defaultMempoolCap = 64
 
 type memoryPool struct {
 	mu         sync.RWMutex
@@ -24,12 +23,24 @@ func newMempool() *memoryPool {
 	}
 }
 
-func (mp *memoryPool) add(tx *types.Transaction) {
+func (mp *memoryPool) add(tx *types.Transaction) bool {
+
+	ok, err := tx.Sender.Verify(tx.Hash, tx.Signature)
+	if err != nil || !ok {
+		log.WithField("service", "mempool").
+			WithError(err).
+			WithField("ok", ok).
+			WithField("hash", tx.Hash.String()).
+			Debug("skip")
+
+		return false
+	}
+
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
 
 	if _, ok := mp.txs[tx.Hash]; ok {
-		return
+		return false
 	}
 
 	var (
@@ -49,6 +60,7 @@ func (mp *memoryPool) add(tx *types.Transaction) {
 	}
 
 	mp.txs[tx.Hash] = txElement
+	return true
 }
 
 func (mp *memoryPool) remove(hash types.Hash) {
@@ -62,14 +74,6 @@ func (mp *memoryPool) remove(hash types.Hash) {
 
 	mp.orderedTxs.Remove(txElement)
 	delete(mp.txs, hash)
-}
-
-func (mp *memoryPool) contains(hash types.Hash) bool {
-	mp.mu.RLock()
-	_, contains := mp.txs[hash]
-	mp.mu.Unlock()
-
-	return contains
 }
 
 func (mp *memoryPool) size() int {
