@@ -90,6 +90,12 @@ func (tui *TerminalUI) configureCommands() {
 			tui.processBlockByNumberCommand()
 		case blockByHash:
 			tui.processBlockByHashCommand()
+		case txByHash:
+			tui.processTxByHash()
+		case balance:
+			tui.processBalance()
+		case sendTransaction:
+			tui.processSendTxCommand()
 		case quit:
 			tui.app.Stop()
 		default:
@@ -98,9 +104,9 @@ func (tui *TerminalUI) configureCommands() {
 	})
 
 	tui.addAllCommands().
-		SetShortcutColor(tcell.ColorRed).
+		SetShortcutColor(tcell.ColorGreenYellow).
 		SetBorder(true).
-		SetTitle("Commands")
+		SetTitle("Команды")
 }
 
 func (tui *TerminalUI) configureMain() {
@@ -127,7 +133,7 @@ func (tui *TerminalUI) configureMempool() {
 	tui.mempool.
 		SetDynamicColors(true).
 		SetBorder(true).
-		SetTitle("Mempool")
+		SetTitle("Мемпул")
 }
 
 func (tui *TerminalUI) run() error {
@@ -143,8 +149,8 @@ func (tui *TerminalUI) updateLastBlock() {
 
 		for block := range blockSub {
 			fmt.Fprintf(tui.header.Clear(),
-				"[red]ПОСЛЕДНИЙ БЛОК:[white]\n[red]НОМЕР:[white] %d [red]ВРЕМЯ:[white] %s [red]NONCE:[white] %d\n[red]ХЕШ:[white] %s",
-				block.Number, time.Unix(block.Timestamp, 0).String(), block.Nonce, block.Hash.String(),
+				"[greenyellow]ПОСЛЕДНИЙ БЛОК:[white]\n[greenyellow]НОМЕР:[white] %d [greenyellow]ВРЕМЯ:[white] %s [greenyellow]NONCE:[white] %d\n[greenyellow]ХЕШ:[white] %s",
+				block.Number, time.Unix(block.Timestamp, 0), block.Nonce, block.Hash.String(),
 			)
 		}
 	}()
@@ -164,7 +170,7 @@ func (tui *TerminalUI) updateMempool() {
 			tui.mempool.Clear()
 
 			for i, tx := range txs {
-				fmt.Fprintf(tui.mempool, "[red](%d)[white] %s\n", i+1, tx.Hash.String())
+				fmt.Fprintf(tui.mempool, "[greenyellow](%d)[white] %s\n", i+1, tx.Hash.String())
 			}
 		}
 	}()

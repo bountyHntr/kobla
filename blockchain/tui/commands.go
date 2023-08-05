@@ -31,7 +31,7 @@ var allCommands = []struct {
 	{txByHash, "ТРАНЗАКЦИЯ ПО ХЕШУ"},
 	{balance, "БАЛАНС АДРЕСА"},
 	{sendTransaction, "ОТПРАВИТЬ ТРАНЗАКЦИЮ"},
-	{mineBlock, "СФОРМИРОВАТЬ ('ЗАМАЙНИТЬ') БЛОК"},
+	{mineBlock, "СФОРМИРОВАТЬ БЛОК"},
 	{quit, "ВЫЙТИ"},
 }
 
@@ -82,19 +82,81 @@ func (tui *TerminalUI) processBlockByHashCommand() {
 		hash := types.HashFromString(input)
 		block, err := tui.bc.BlockByHash(hash)
 		if err != nil {
-			return fmt.Sprintf("Error: can't get block %s: %s", hash.String(), err)
+			return fmt.Sprintf("Error: can't get block %s: %s", hash, err)
 		}
 
 		return sprintBlock(block)
 	})
 }
 
-func (tui *TerminalUI) processSendTxCommand() {
+func (tui *TerminalUI) processTxByHash() {
+	inputField := tview.NewInputField().
+		SetFieldWidth(128).
+		SetLabel("ВВЕДИТЕ ХЕШ ТРАНЗАКЦИИ:")
 
+	tui.addInputField(inputField, func(input string) (s string) {
+		defer func() {
+			if r := recover(); r != nil {
+				s = fmt.Sprintf("Error: %s: %s", input, r)
+			}
+		}()
+
+		defer tui.app.SetFocus(tui.commands)
+
+		hash := types.HashFromString(input)
+		tx, err := tui.bc.TxByHash(hash)
+		if err != nil {
+			return fmt.Sprintf("Error: can't get tx %s: %s", hash, err)
+		}
+
+		return sprintTx(tx)
+	})
+}
+
+func (tui *TerminalUI) processBalance() {
+	inputField := tview.NewInputField().
+		SetFieldWidth(256).
+		SetLabel("ВВЕДИТЕ АДРЕС КОШЕЛЬКА:")
+
+	tui.addInputField(inputField, func(input string) (s string) {
+		defer tui.app.SetFocus(tui.commands)
+
+		address := types.AddressFromString(input)
+		balance, err := tui.bc.Balance(address)
+		if err != nil {
+			return fmt.Sprintf("Error: can't get balance %s: %s", address, err)
+		}
+
+		return fmt.Sprintf("[greenyellow]АДРЕС:[white] %s\n[greenyellow]БАЛАНС:[white] %d", address, balance)
+	})
+}
+
+func (tui *TerminalUI) processSendTxCommand() {
+	const backgroundColor = 0x000003
+
+	form := tview.NewForm().
+		AddInputField("ОТПРАВИТЕЛЬ:", "", 256, nil, nil).
+		AddInputField("ПОЛУЧАТЕЛЬ:", "", 256, nil, nil).
+		AddInputField("СУММА ПЕРЕВОДА:", "", 40, tview.InputFieldInteger, nil).
+		AddInputField("ДАННЫЕ:", "", 2048, nil, nil).
+		AddButton("ОТПРАВИТЬ", func() {
+		})
+
+	form.SetFieldBackgroundColor(backgroundColor).
+		SetFieldTextColor(tcell.ColorWhite).
+		SetButtonBackgroundColor(backgroundColor).
+		SetButtonTextColor(tcell.ColorDarkSeaGreen)
+
+	form.SetLabelColor(tcell.ColorGreenYellow).
+		SetBackgroundColor(tcell.ColorBlack).
+		SetBorder(true)
+
+	tui.mflex.AddItem(form, 0, 2, false)
+	tui.app.SetFocus(form)
 }
 
 func (tui *TerminalUI) addInputField(inputField *tview.InputField, f func(string) string) {
-	inputField.SetLabelColor(tcell.ColorRed).
+	inputField.SetLabelColor(tcell.ColorGreenYellow).
 		SetFieldBackgroundColor(tcell.ColorBlack).
 		SetBorder(true)
 
