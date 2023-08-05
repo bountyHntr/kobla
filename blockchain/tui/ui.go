@@ -120,9 +120,7 @@ func (tui *TerminalUI) configureMain() {
 		}
 	})
 
-	tui.main.
-		SetDynamicColors(true).
-		SetBorder(true)
+	tui.main.SetDynamicColors(true).SetBorder(true)
 }
 
 func (tui *TerminalUI) configureMempool() {
