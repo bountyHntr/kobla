@@ -64,6 +64,10 @@ func (a Account) Verify(hash Hash, signature []byte) (bool, error) {
 	return a.pub.VerifyDigest(hash[:], signature)
 }
 
+func (a Account) PrivateKey() string {
+	return base58.Encode(a.prv.Raw())
+}
+
 type Address [AddressLength]byte
 
 var ZeroAddress = Address{}

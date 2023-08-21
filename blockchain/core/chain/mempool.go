@@ -108,6 +108,18 @@ func (mp *memoryPool) top(n int) (txs []*types.Transaction) {
 	return
 }
 
+func (mp *memoryPool) get(hash types.Hash) *types.Transaction {
+	mp.mu.RLock()
+	defer mp.mu.RUnlock()
+
+	txElement := mp.txs[hash]
+	if txElement == nil {
+		return nil
+	}
+
+	return txElement.Value.(*types.Transaction)
+}
+
 func (mp *memoryPool) subscribeUpdates(subCh chan *types.Void) SubscriptionID {
 	return mp.subs.subscribe(subCh)
 }

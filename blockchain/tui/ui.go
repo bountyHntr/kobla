@@ -94,8 +94,12 @@ func (tui *TerminalUI) configureCommands() {
 			tui.processTxByHash()
 		case balance:
 			tui.processBalance()
+		case newAccount:
+			tui.processNewAccount()
 		case sendTransaction:
 			tui.processSendTxCommand()
+		case mineBlock:
+			tui.processMineBlockCommand()
 		case quit:
 			tui.app.Stop()
 		default:

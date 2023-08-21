@@ -10,7 +10,10 @@ import (
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var ErrInvalidBlockNumber = errors.New("invalid block number")
+var (
+	ErrInvalidBlockNumber = errors.New("invalid block number")
+	ErrUnknownTxHash      = errors.New("unknown tx hash")
+)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -75,6 +78,15 @@ func (bc *Blockchain) Balance(address types.Address) (uint64, error) {
 
 func (bc *Blockchain) TopMempoolTxs(n int) []*types.Transaction {
 	return bc.mempool.top(n)
+}
+
+func (bc *Blockchain) TxByHashFromMempool(txHash types.Hash) (*types.Transaction, error) {
+	tx := bc.mempool.get(txHash)
+	if tx == nil {
+		return nil, ErrUnknownTxHash
+	}
+
+	return tx, nil
 }
 
 func (bc *Blockchain) MempoolSize() int {
