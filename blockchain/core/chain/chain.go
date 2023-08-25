@@ -123,7 +123,7 @@ func (bc *Blockchain) addBlock(block *types.Block) error {
 		return err
 	}
 
-	if err := bc.newBlock(block); err != nil {
+	if err := bc.newBlock(block); err != nil && !errors.Is(err, ErrInvalidParentBlock) {
 		return fmt.Errorf("new block %d: %w", block.Number, err)
 	}
 

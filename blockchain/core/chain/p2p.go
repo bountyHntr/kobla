@@ -203,8 +203,10 @@ func (cm *communicationManager) handleNewTx(data []byte) error {
 		return fmt.Errorf("deserialize tx: %w", err)
 	}
 
-	cm.bc.mempool.add(tx)
-	cm.broadcast(tx)
+	if ok := cm.bc.mempool.add(tx); ok {
+		cm.broadcast(tx)
+	}
+
 	return nil
 }
 
