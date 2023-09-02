@@ -52,9 +52,21 @@ func buildConfig() chain.Config {
 		log.Fatalf("failed to read config file %s: %s", *cfgPath, err)
 	}
 
+	log.Infof("path to database: %s", cfg.DbPath)
+	log.Infof("consensus protocol: %s", cfg.Consensus)
+	log.Infof("node URL address: %s", cfg.Url)
+
 	nodes := make([]string, len(cfg.Nodes))
 	for _, node := range cfg.Nodes {
 		nodes = append(nodes, node.Url)
+		log.Infof("node: %s", node)
+	}
+
+	if cfg.Genesis {
+		log.Infof("launching new blockchain")
+		if len(nodes) != 0 {
+			log.Warn("there are no other nodes at the moment...")
+		}
 	}
 
 	var consensus types.ConsesusProtocol
@@ -62,8 +74,10 @@ func buildConfig() chain.Config {
 	case "pow", "":
 		consensus = pow.New()
 	case "poa":
+		log.Infof("%d validators:", len(cfg.Nodes))
 		validators := make([]poa.Validator, len(cfg.Nodes))
 		for _, node := range cfg.Nodes {
+			log.Infof("validator:\n\t url: %s\n\t address: %s", node.Url, node.Address)
 			validators = append(validators, poa.Validator{
 				Url:     node.Url,
 				Address: types.AddressFromString(node.Address),

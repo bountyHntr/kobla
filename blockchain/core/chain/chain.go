@@ -49,7 +49,7 @@ type Blockchain struct {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func New(cfg *Config) (*Blockchain, error) {
-	log.Info("init database")
+	log.WithField("path", cfg.DBPath).Info("init database")
 
 	database, err := db.New(cfg.DBPath)
 	if err != nil {
