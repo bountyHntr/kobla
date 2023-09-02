@@ -1,6 +1,7 @@
 package types
 
 type ConsesusProtocol interface {
-	Run(block *Block) error
-	Validate(block *Block) bool
+	Run(block *Block, meta any) error
+	Validate(block *Block, meta any) bool
+	NodesAreFixed() bool
 }

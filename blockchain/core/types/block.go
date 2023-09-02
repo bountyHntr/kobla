@@ -32,6 +32,7 @@ func NewBlock(
 	txs []*Transaction,
 	prevBlock *Block,
 	coinbase Address,
+	meta any,
 ) (block *Block, err error) {
 
 	block = &Block{
@@ -42,7 +43,7 @@ func NewBlock(
 		Coinbase:      coinbase,
 	}
 
-	if err = cons.Run(block); err != nil {
+	if err = cons.Run(block, meta); err != nil {
 		return nil, fmt.Errorf("Proof-Of-Work: %w", err)
 	}
 

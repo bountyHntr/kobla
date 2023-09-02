@@ -46,25 +46,32 @@ const (
 type communicationManager struct {
 	mu         sync.RWMutex
 	url        string
+	dialer     net.Dialer
 	knownNodes map[string]struct{}
 	bc         *Blockchain
 }
 
-func newCommunicationManager(url, syncNode string, bc *Blockchain) *communicationManager {
+func newCommunicationManager(url string, nodes []string, bc *Blockchain) (*communicationManager, error) {
 	knownNodes := make(map[string]struct{})
-	if syncNode != "" {
-		knownNodes[syncNode] = struct{}{}
+	for _, node := range nodes {
+		knownNodes[node] = struct{}{}
 	}
 
 	if url == "" {
 		url = defaultAddress
 	}
 
+	address, err := net.ResolveTCPAddr(netProtocol, url)
+	if err != nil {
+		return nil, fmt.Errorf("resolve TCP address: %w", err)
+	}
+
 	return &communicationManager{
 		url:        url,
+		dialer:     net.Dialer{LocalAddr: address},
 		knownNodes: knownNodes,
 		bc:         bc,
-	}
+	}, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -130,7 +137,7 @@ func (cm *communicationManager) handleConnection(conn net.Conn) {
 	case commandGetBlock:
 		err = cm.handleGetBlock(conn, request)
 	case commandNewBlock:
-		err = cm.handleNewBlock(request)
+		err = cm.handleNewBlock(request, remote)
 	case commandNewTx:
 		err = cm.handleNewTx(request)
 	}
@@ -187,13 +194,13 @@ func (cm *communicationManager) handleGetBlock(conn net.Conn, request []byte) (e
 	return writeResponse(conn, data)
 }
 
-func (cm *communicationManager) handleNewBlock(data []byte) error {
+func (cm *communicationManager) handleNewBlock(data []byte, meta any) error {
 	block, err := types.DeserializeBlock(data)
 	if err != nil {
 		return fmt.Errorf("deserialize block: %w", err)
 	}
 
-	if err := cm.bc.addBlock(block); err != nil {
+	if err := cm.bc.addBlock(block, meta); err != nil {
 		return fmt.Errorf("add block: %w", err)
 	}
 
@@ -224,7 +231,7 @@ func (cm *communicationManager) sendSync() error {
 
 	log.WithField("sync_node", syncNode).Debug("send sync")
 
-	conn, err := newConnection(syncNode)
+	conn, err := cm.newConnection(syncNode)
 	if err != nil {
 		cm.removeNode(syncNode)
 		return err
@@ -261,7 +268,7 @@ func (cm *communicationManager) sendGetBlock(syncNode string, blockNumber int64)
 		WithField("block_number", blockNumber).
 		Debug("send get block")
 
-	conn, err := newConnection(syncNode)
+	conn, err := cm.newConnection(syncNode)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +304,7 @@ func (cm *communicationManager) sync(syncNode string, lastBlockNumber int64) err
 			return fmt.Errorf("get block: %w", err)
 		}
 
-		if err := cm.bc.addBlock(block); err != nil {
+		if err := cm.bc.addBlock(block, syncNode); err != nil {
 			return fmt.Errorf("add block: %w", err)
 		}
 	}
@@ -326,7 +333,7 @@ func (cm *communicationManager) broadcast(msg types.Serializable) {
 
 	for node := range cm.knownNodes {
 
-		conn, err := newConnection(node)
+		conn, err := cm.newConnection(node)
 		if err != nil {
 			log.WithField("node", node).WithError(err).Error("new connection")
 			continue
@@ -343,6 +350,10 @@ func (cm *communicationManager) broadcast(msg types.Serializable) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func (cm *communicationManager) addNewNode(node string) {
+	if cm.bc.cons.NodesAreFixed() {
+		return
+	}
+
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -355,6 +366,10 @@ func (cm *communicationManager) addNewNode(node string) {
 }
 
 func (cm *communicationManager) removeNode(node string) {
+	if cm.bc.cons.NodesAreFixed() {
+		return
+	}
+
 	cm.mu.Lock()
 	log.WithField("node", node).Debug("remove node")
 	delete(cm.knownNodes, node)
@@ -382,15 +397,15 @@ func (cm *communicationManager) copyNodes() (knownNodes []string) {
 	return
 }
 
-func newConnection(node string) (net.Conn, error) {
-	conn, err := net.Dial(netProtocol, node)
+func (cm *communicationManager) newConnection(node string) (net.Conn, error) {
+	conn, err := cm.dialer.Dial(netProtocol, node)
 	if err != nil {
 		return nil, fmt.Errorf("connect to %s: %w", node, err)
 	}
 	return conn, nil
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 func write(conn net.Conn, command Command, data []byte) (err error) {
 	defer func() {

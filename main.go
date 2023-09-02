@@ -3,11 +3,29 @@ package main
 import (
 	"flag"
 	"kobla/blockchain/core/chain"
+	"kobla/blockchain/core/consensus/poa"
 	"kobla/blockchain/core/consensus/pow"
+	"kobla/blockchain/core/types"
 	"kobla/blockchain/tui"
+	"os"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 )
+
+type Node struct {
+	Url     string `yaml:"URL"`
+	Address string `yaml:"Address"`
+}
+
+type Config struct {
+	Url       string `yaml:"URL"`
+	Genesis   bool   `yaml:"Genesis"`
+	DbPath    string `yaml:"DBPath"`
+	Consensus string `yaml:"Consensus"`
+	Nodes     []Node `yaml:"Nodes"`
+}
 
 func main() {
 	log.SetLevel(log.DebugLevel)
@@ -26,18 +44,56 @@ func main() {
 
 func buildConfig() chain.Config {
 
-	url := flag.String("url", "localhost:8090", "address where the node is listening")
-	genesis := flag.Bool("genesis", false, "flag that indicates that a new network is being created")
-	syncNode := flag.String("sync_node", "", "flag that indicates that a new network is being created")
-	dbPath := flag.String("db_path", "./.data", "node database path")
-
+	cfgPath := flag.String("cfg", "config.yaml", "path to yaml config file")
 	flag.Parse()
 
-	return chain.Config{
-		DBPath:    *dbPath,
-		Consensus: pow.New(),
-		URL:       *url,
-		SyncNode:  *syncNode,
-		Genesis:   *genesis,
+	var cfg Config
+	if err := parseConfigFromFile(*cfgPath, &cfg); err != nil {
+		log.Fatalf("failed to read config file %s: %s", *cfgPath, err)
 	}
+
+	nodes := make([]string, len(cfg.Nodes))
+	for _, node := range cfg.Nodes {
+		nodes = append(nodes, node.Url)
+	}
+
+	var consensus types.ConsesusProtocol
+	switch cfg.Consensus {
+	case "pow", "":
+		consensus = pow.New()
+	case "poa":
+		validators := make([]poa.Validator, len(cfg.Nodes))
+		for _, node := range cfg.Nodes {
+			validators = append(validators, poa.Validator{
+				Url:     node.Url,
+				Address: types.AddressFromString(node.Address),
+			})
+		}
+
+		consensus = poa.New(validators)
+	}
+
+	return chain.Config{
+		DBPath:    cfg.DbPath,
+		Consensus: consensus,
+		URL:       cfg.Url,
+		Nodes:     nodes,
+		Genesis:   cfg.Genesis,
+	}
+}
+
+func parseConfigFromFile(fileName string, cfg interface{}) error {
+	rawCfg, err := os.ReadFile(fileName)
+	if err != nil {
+		return err
+	}
+	return parseConfigRaw(rawCfg, cfg)
+}
+
+func parseConfigRaw(rawCfg []byte, cfg interface{}) error {
+	err := yaml.Unmarshal(rawCfg, cfg)
+	if err != nil {
+		return errors.Wrap(err, "failed to unmarshal config file")
+	}
+	return nil
 }

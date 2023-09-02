@@ -22,14 +22,16 @@ var target = new(big.Int).Lsh(common.BigOne, types.HashBits-targetBits)
 
 type ProofOfWork struct{}
 
-func New() *ProofOfWork {
+func New() types.ConsesusProtocol {
 	return &ProofOfWork{}
 }
 
-var _ types.ConsesusProtocol = ProofOfWork{}
+func (ProofOfWork) NodesAreFixed() bool {
+	return false
+}
 
 // updates the state of the block
-func (ProofOfWork) Run(block *types.Block) error {
+func (ProofOfWork) Run(block *types.Block, _ any) error {
 	if block.Nonce != 0 {
 		return ErrBlockAlreadyMined
 	}
@@ -47,7 +49,7 @@ func (ProofOfWork) Run(block *types.Block) error {
 	return ErrNonceNotFound
 }
 
-func (ProofOfWork) Validate(block *types.Block) bool {
+func (ProofOfWork) Validate(block *types.Block, _ any) bool {
 	data, err := block.Serialize()
 	if err != nil {
 		return false

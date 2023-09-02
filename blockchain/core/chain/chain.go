@@ -18,6 +18,7 @@ var (
 	ErrZeroAddressScam     = errors.New("zero address scam")
 	ErrDuplicateCoinbaseTx = errors.New("duplicate coinbase tx")
 	ErrNoCoinbaseTx        = errors.New("no coinbase tx")
+	ErrConsensusBroken     = errors.New("consensus broken")
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,7 +27,7 @@ type Config struct {
 	DBPath    string
 	Consensus types.ConsesusProtocol
 	URL       string
-	SyncNode  string
+	Nodes     []string
 	Genesis   bool
 }
 
@@ -64,7 +65,10 @@ func New(cfg *Config) (*Blockchain, error) {
 		blockSubs: newSubscription[types.Block](),
 	}
 
-	bc.comm = newCommunicationManager(cfg.URL, cfg.SyncNode, &bc)
+	bc.comm, err = newCommunicationManager(cfg.URL, cfg.Nodes, &bc)
+	if err != nil {
+		return nil, fmt.Errorf("new communication manager: %w", err)
+	}
 
 	hash, err := database.LastBlockHash()
 	if err != nil {
@@ -103,12 +107,12 @@ func (bc *Blockchain) mineBlock(txs []*types.Transaction, coinbase types.Address
 		return err
 	}
 
-	newBlock, err := types.NewBlock(bc.cons, txs, bc.lastBlock(), coinbase)
+	newBlock, err := types.NewBlock(bc.cons, txs, bc.lastBlock(), coinbase, bc.comm.url)
 	if err != nil {
 		return fmt.Errorf("create new block: %w", err)
 	}
 
-	if err = bc.newBlock(newBlock); err != nil {
+	if err = bc.newBlock(newBlock, bc.comm.url); err != nil {
 		return fmt.Errorf("new block %d: %w", newBlock.Number, err)
 	}
 
@@ -117,13 +121,13 @@ func (bc *Blockchain) mineBlock(txs []*types.Transaction, coinbase types.Address
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func (bc *Blockchain) addBlock(block *types.Block) error {
+func (bc *Blockchain) addBlock(block *types.Block, meta any) error {
 
 	if err := validateTxs(block.Transactions, block.Coinbase); err != nil {
 		return err
 	}
 
-	if err := bc.newBlock(block); err != nil && !errors.Is(err, ErrInvalidParentBlock) {
+	if err := bc.newBlock(block, meta); err != nil && !errors.Is(err, ErrInvalidParentBlock) {
 		return fmt.Errorf("new block %d: %w", block.Number, err)
 	}
 
@@ -192,7 +196,11 @@ func (bc *Blockchain) saveNewBlock(block *types.Block) error {
 	return nil
 }
 
-func (bc *Blockchain) newBlock(block *types.Block) error {
+func (bc *Blockchain) newBlock(block *types.Block, meta any) error {
+	if !bc.cons.Validate(block, meta) {
+		return ErrConsensusBroken
+	}
+
 	if err := bc.saveNewBlock(block); err != nil {
 		return fmt.Errorf("save new block %d: %w", block.Number, err)
 	}
