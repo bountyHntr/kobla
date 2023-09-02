@@ -31,4 +31,5 @@ message Transaction {
 message ChainStatus {
    int64 height = 1;
    string address_from = 2;
+   repeated string known_addresses = 3;
 }

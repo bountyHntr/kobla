@@ -150,6 +150,9 @@ func (cm *communicationManager) handleSync(conn net.Conn, requestData []byte) er
 	}
 
 	cm.addNewNode(request.AddressFrom)
+	for _, address := range request.KnownAddresses {
+		cm.addNewNode(address)
+	}
 
 	responseData, err := proto.Marshal(cm.chainStatus())
 	if err != nil {
@@ -304,8 +307,9 @@ func (cm *communicationManager) sync(syncNode string, lastBlockNumber int64) err
 
 func (cm *communicationManager) chainStatus() *pb.ChainStatus {
 	return &pb.ChainStatus{
-		Height:      cm.bc.lastBlock().Number,
-		AddressFrom: cm.url,
+		Height:         cm.bc.lastBlock().Number,
+		AddressFrom:    cm.url,
+		KnownAddresses: cm.copyNodes(),
 	}
 }
 
@@ -362,6 +366,16 @@ func (cm *communicationManager) randomNode() (node string) {
 	for n := range cm.knownNodes {
 		node = n
 		break
+	}
+	cm.mu.RUnlock()
+
+	return
+}
+
+func (cm *communicationManager) copyNodes() (knownNodes []string) {
+	cm.mu.RLock()
+	for node := range cm.knownNodes {
+		knownNodes = append(knownNodes, node)
 	}
 	cm.mu.RUnlock()
 
