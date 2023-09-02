@@ -24,11 +24,12 @@ var (
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Config struct {
-	DBPath    string
-	Consensus types.ConsesusProtocol
-	URL       string
-	Nodes     []string
-	Genesis   bool
+	DBPath       string
+	Consensus    types.ConsesusProtocol
+	Url          string
+	ListeningUrl string
+	Nodes        []string
+	Genesis      bool
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -65,7 +66,7 @@ func New(cfg *Config) (*Blockchain, error) {
 		blockSubs: newSubscription[types.Block](),
 	}
 
-	bc.comm, err = newCommunicationManager(cfg.URL, cfg.Nodes, &bc)
+	bc.comm, err = newCommunicationManager(cfg.Url, cfg.ListeningUrl, cfg.Nodes, &bc)
 	if err != nil {
 		return nil, fmt.Errorf("new communication manager: %w", err)
 	}

@@ -28,10 +28,6 @@ func New(validators []Validator) types.ConsesusProtocol {
 	return &poa
 }
 
-func (ProofOfAuthority) NodesAreFixed() bool {
-	return true
-}
-
 // updates the state of the block
 func (poa *ProofOfAuthority) Run(block *types.Block, _ any) error {
 	block.SetHash()
@@ -39,6 +35,10 @@ func (poa *ProofOfAuthority) Run(block *types.Block, _ any) error {
 }
 
 func (poa *ProofOfAuthority) Validate(block *types.Block, meta any) bool {
+	if block.Coinbase == types.ZeroAddress && block.Number == 0 {
+		return true
+	}
+
 	validator := Validator{
 		Url:     meta.(string),
 		Address: block.Coinbase,

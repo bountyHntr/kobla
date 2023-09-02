@@ -10,21 +10,24 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
+
+	log "github.com/sirupsen/logrus"
 )
 
-type Node struct {
+type Validator struct {
 	Url     string `yaml:"URL"`
 	Address string `yaml:"Address"`
 }
 
 type Config struct {
-	Url       string `yaml:"URL"`
-	Genesis   bool   `yaml:"Genesis"`
-	DbPath    string `yaml:"DBPath"`
-	Consensus string `yaml:"Consensus"`
-	Nodes     []Node `yaml:"Nodes"`
+	Url          string      `yaml:"URL"`
+	ListeningUrl string      `yaml:"ListeningURL"`
+	Genesis      bool        `yaml:"Genesis"`
+	DbPath       string      `yaml:"DBPath"`
+	Consensus    string      `yaml:"Consensus"`
+	Nodes        []string    `yaml:"Nodes"`
+	Validators   []Validator `yaml:"Validators"`
 }
 
 func main() {
@@ -43,7 +46,6 @@ func main() {
 }
 
 func buildConfig() chain.Config {
-
 	cfgPath := flag.String("cfg", "config.yaml", "path to yaml config file")
 	flag.Parse()
 
@@ -54,46 +56,60 @@ func buildConfig() chain.Config {
 
 	log.Infof("path to database: %s", cfg.DbPath)
 	log.Infof("consensus protocol: %s", cfg.Consensus)
-	log.Infof("node URL address: %s", cfg.Url)
-
-	nodes := make([]string, len(cfg.Nodes))
-	for _, node := range cfg.Nodes {
-		nodes = append(nodes, node.Url)
-		log.Infof("node: %s", node)
-	}
+	log.Infof("node URL: %s", cfg.Url)
+	log.Infof("node listening URL: %s", cfg.ListeningUrl)
 
 	if cfg.Genesis {
 		log.Infof("launching new blockchain")
-		if len(nodes) != 0 {
-			log.Warn("there are no other nodes at the moment...")
-		}
 	}
 
-	var consensus types.ConsesusProtocol
+	return chain.Config{
+		DBPath:       cfg.DbPath,
+		Consensus:    parseConsensusProtocol(&cfg),
+		Url:          cfg.Url,
+		ListeningUrl: cfg.ListeningUrl,
+		Nodes:        parseNodes(&cfg),
+		Genesis:      cfg.Genesis,
+	}
+}
+
+func parseNodes(cfg *Config) []string {
+	nodes := make([]string, 0, len(cfg.Nodes))
+
+	for _, node := range cfg.Nodes {
+		if node == cfg.Url {
+			continue
+		}
+
+		nodes = append(nodes, node)
+		log.Infof("node: %s", node)
+	}
+
+	return nodes
+}
+
+func parseConsensusProtocol(cfg *Config) (consensus types.ConsesusProtocol) {
 	switch cfg.Consensus {
-	case "pow", "":
+	case "", "PoW":
 		consensus = pow.New()
-	case "poa":
-		log.Infof("%d validators:", len(cfg.Nodes))
-		validators := make([]poa.Validator, len(cfg.Nodes))
-		for _, node := range cfg.Nodes {
-			log.Infof("validator:\n\t url: %s\n\t address: %s", node.Url, node.Address)
+	case "PoA":
+		log.Infof("%d validators:", len(cfg.Validators))
+
+		validators := make([]poa.Validator, 0, len(cfg.Nodes))
+		for _, v := range cfg.Validators {
+			log.Infof("validator url: %s", v.Url)
+			log.Infof("validator address: %s", v.Address)
+
 			validators = append(validators, poa.Validator{
-				Url:     node.Url,
-				Address: types.AddressFromString(node.Address),
+				Url:     v.Url,
+				Address: types.AddressFromString(v.Address),
 			})
 		}
 
 		consensus = poa.New(validators)
 	}
 
-	return chain.Config{
-		DBPath:    cfg.DbPath,
-		Consensus: consensus,
-		URL:       cfg.Url,
-		Nodes:     nodes,
-		Genesis:   cfg.Genesis,
-	}
+	return
 }
 
 func parseConfigFromFile(fileName string, cfg interface{}) error {

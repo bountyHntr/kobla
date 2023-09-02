@@ -26,10 +26,6 @@ func New() types.ConsesusProtocol {
 	return &ProofOfWork{}
 }
 
-func (ProofOfWork) NodesAreFixed() bool {
-	return false
-}
-
 // updates the state of the block
 func (ProofOfWork) Run(block *types.Block, _ any) error {
 	if block.Nonce != 0 {

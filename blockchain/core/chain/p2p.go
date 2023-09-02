@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-reuseport"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 )
@@ -25,10 +26,7 @@ var (
 	ErrInternalError    = errors.New("internal error")
 )
 
-const (
-	defaultAddress = "localhost:8888"
-	netProtocol    = "tcp"
-)
+const netProtocol = "tcp"
 
 //go:generate stringer -type=Command
 type Command int
@@ -44,40 +42,31 @@ const (
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type communicationManager struct {
-	mu         sync.RWMutex
-	url        string
-	dialer     net.Dialer
-	knownNodes map[string]struct{}
-	bc         *Blockchain
+	mu           sync.RWMutex
+	url          string
+	listeningUrl string
+	knownNodes   map[string]struct{}
+	bc           *Blockchain
 }
 
-func newCommunicationManager(url string, nodes []string, bc *Blockchain) (*communicationManager, error) {
+func newCommunicationManager(url, listeningUrl string, nodes []string, bc *Blockchain) (*communicationManager, error) {
 	knownNodes := make(map[string]struct{})
 	for _, node := range nodes {
 		knownNodes[node] = struct{}{}
 	}
 
-	if url == "" {
-		url = defaultAddress
-	}
-
-	address, err := net.ResolveTCPAddr(netProtocol, url)
-	if err != nil {
-		return nil, fmt.Errorf("resolve TCP address: %w", err)
-	}
-
 	return &communicationManager{
-		url:        url,
-		dialer:     net.Dialer{LocalAddr: address},
-		knownNodes: knownNodes,
-		bc:         bc,
+		listeningUrl: listeningUrl,
+		url:          url,
+		knownNodes:   knownNodes,
+		bc:           bc,
 	}, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func (cm *communicationManager) listen() error {
-	ln, err := net.Listen(netProtocol, cm.url)
+	ln, err := reuseport.Listen(netProtocol, cm.listeningUrl)
 	if err != nil {
 		return err
 	}
@@ -256,9 +245,11 @@ func (cm *communicationManager) sendSync() error {
 		return fmt.Errorf("unmarshal: %w", err)
 	}
 
-	if err := cm.sync(syncNode, response.Height); err != nil {
-		return fmt.Errorf("sync: %w", err)
-	}
+	go func() {
+		if err := cm.sync(syncNode, response.Height); err != nil {
+			log.Errorf("sync from node %s: %s", syncNode, err)
+		}
+	}()
 
 	return nil
 }
@@ -350,10 +341,6 @@ func (cm *communicationManager) broadcast(msg types.Serializable) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func (cm *communicationManager) addNewNode(node string) {
-	if cm.bc.cons.NodesAreFixed() {
-		return
-	}
-
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -366,10 +353,6 @@ func (cm *communicationManager) addNewNode(node string) {
 }
 
 func (cm *communicationManager) removeNode(node string) {
-	if cm.bc.cons.NodesAreFixed() {
-		return
-	}
-
 	cm.mu.Lock()
 	log.WithField("node", node).Debug("remove node")
 	delete(cm.knownNodes, node)
@@ -397,11 +380,24 @@ func (cm *communicationManager) copyNodes() (knownNodes []string) {
 	return
 }
 
-func (cm *communicationManager) newConnection(node string) (net.Conn, error) {
-	conn, err := cm.dialer.Dial(netProtocol, node)
-	if err != nil {
-		return nil, fmt.Errorf("connect to %s: %w", node, err)
+func (cm *communicationManager) newConnection(node string) (conn net.Conn, err error) {
+	const (
+		reconnectTimeout = 200 * time.Millisecond
+		expectedErrorMsg = "cannot assign requested address"
+	)
+
+	for {
+		conn, err = reuseport.Dial(netProtocol, cm.url, node)
+		if err != nil {
+			if strings.Contains(err.Error(), expectedErrorMsg) {
+				time.Sleep(reconnectTimeout)
+				continue
+			}
+			return nil, fmt.Errorf("connect to %s: %w", node, err)
+		}
+		break
 	}
+
 	return conn, nil
 }
 
