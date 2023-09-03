@@ -1,3 +1,5 @@
+//go:build pow
+
 package pow
 
 import (
@@ -27,7 +29,7 @@ func New() types.ConsesusProtocol {
 }
 
 // updates the state of the block
-func (ProofOfWork) Run(block *types.Block, _ any) error {
+func (ProofOfWork) Run(block *types.Block) error {
 	if block.Nonce != 0 {
 		return ErrBlockAlreadyMined
 	}
@@ -45,7 +47,7 @@ func (ProofOfWork) Run(block *types.Block, _ any) error {
 	return ErrNonceNotFound
 }
 
-func (ProofOfWork) Validate(block *types.Block, _ any) bool {
+func (ProofOfWork) Validate(block *types.Block) bool {
 	data, err := block.Serialize()
 	if err != nil {
 		return false

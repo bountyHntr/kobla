@@ -47,3 +47,7 @@ func (h Hash) String() string {
 func (h Hash) Bytes() []byte {
 	return h[:]
 }
+
+func (h Hash) isEmpty() bool {
+	return h == EmptyHash
+}

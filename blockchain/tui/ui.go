@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"kobla/blockchain/core/chain"
 	"kobla/blockchain/core/types"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -140,22 +139,6 @@ func (tui *TerminalUI) configureMempool() {
 
 func (tui *TerminalUI) run() error {
 	return tui.app.Run()
-}
-
-func (tui *TerminalUI) updateLastBlock() {
-	go func() {
-		blockSub := make(chan *types.Block, 1)
-
-		subID := tui.bc.SubscribeNewBlocks(blockSub)
-		defer tui.bc.UnsubscribeBlocks(subID)
-
-		for block := range blockSub {
-			fmt.Fprintf(tui.header.Clear(),
-				"[greenyellow]ПОСЛЕДНИЙ БЛОК:[white]\n[greenyellow]НОМЕР:[white] %d [greenyellow]ВРЕМЯ:[white] %s [greenyellow]NONCE:[white] %d\n[greenyellow]ХЕШ:[white] %s",
-				block.Number, time.Unix(block.Timestamp, 0), block.Nonce, block.Hash.String(),
-			)
-		}
-	}()
 }
 
 func (tui *TerminalUI) updateMempool() {

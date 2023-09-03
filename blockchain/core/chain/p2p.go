@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-reuseport"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 )
@@ -42,31 +41,29 @@ const (
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type communicationManager struct {
-	mu           sync.RWMutex
-	url          string
-	listeningUrl string
-	knownNodes   map[string]struct{}
-	bc           *Blockchain
+	mu         sync.RWMutex
+	url        string
+	knownNodes map[string]struct{}
+	bc         *Blockchain
 }
 
-func newCommunicationManager(url, listeningUrl string, nodes []string, bc *Blockchain) (*communicationManager, error) {
+func newCommunicationManager(url string, nodes []string, bc *Blockchain) (*communicationManager, error) {
 	knownNodes := make(map[string]struct{})
 	for _, node := range nodes {
 		knownNodes[node] = struct{}{}
 	}
 
 	return &communicationManager{
-		listeningUrl: listeningUrl,
-		url:          url,
-		knownNodes:   knownNodes,
-		bc:           bc,
+		url:        url,
+		knownNodes: knownNodes,
+		bc:         bc,
 	}, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func (cm *communicationManager) listen() error {
-	ln, err := reuseport.Listen(netProtocol, cm.listeningUrl)
+	ln, err := net.Listen(netProtocol, cm.url)
 	if err != nil {
 		return err
 	}
@@ -126,7 +123,7 @@ func (cm *communicationManager) handleConnection(conn net.Conn) {
 	case commandGetBlock:
 		err = cm.handleGetBlock(conn, request)
 	case commandNewBlock:
-		err = cm.handleNewBlock(request, remote)
+		err = cm.handleNewBlock(request)
 	case commandNewTx:
 		err = cm.handleNewTx(request)
 	}
@@ -183,13 +180,13 @@ func (cm *communicationManager) handleGetBlock(conn net.Conn, request []byte) (e
 	return writeResponse(conn, data)
 }
 
-func (cm *communicationManager) handleNewBlock(data []byte, meta any) error {
+func (cm *communicationManager) handleNewBlock(data []byte) error {
 	block, err := types.DeserializeBlock(data)
 	if err != nil {
 		return fmt.Errorf("deserialize block: %w", err)
 	}
 
-	if err := cm.bc.addBlock(block, meta); err != nil {
+	if err := cm.bc.addBlock(block); err != nil {
 		return fmt.Errorf("add block: %w", err)
 	}
 
@@ -295,7 +292,7 @@ func (cm *communicationManager) sync(syncNode string, lastBlockNumber int64) err
 			return fmt.Errorf("get block: %w", err)
 		}
 
-		if err := cm.bc.addBlock(block, syncNode); err != nil {
+		if err := cm.bc.addBlock(block); err != nil {
 			return fmt.Errorf("add block: %w", err)
 		}
 	}
@@ -381,21 +378,9 @@ func (cm *communicationManager) copyNodes() (knownNodes []string) {
 }
 
 func (cm *communicationManager) newConnection(node string) (conn net.Conn, err error) {
-	const (
-		reconnectTimeout = 200 * time.Millisecond
-		expectedErrorMsg = "cannot assign requested address"
-	)
-
-	for {
-		conn, err = reuseport.Dial(netProtocol, cm.url, node)
-		if err != nil {
-			if strings.Contains(err.Error(), expectedErrorMsg) {
-				time.Sleep(reconnectTimeout)
-				continue
-			}
-			return nil, fmt.Errorf("connect to %s: %w", node, err)
-		}
-		break
+	conn, err = net.Dial(netProtocol, node)
+	if err != nil {
+		return nil, fmt.Errorf("connect to %s: %w", node, err)
 	}
 
 	return conn, nil

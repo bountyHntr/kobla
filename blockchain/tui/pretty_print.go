@@ -4,23 +4,10 @@ import (
 	"fmt"
 	"kobla/blockchain/core/types"
 	"strings"
-	"time"
 	"unicode/utf8"
 
 	"github.com/btcsuite/btcutil/base58"
 )
-
-func sprintBlock(block *types.Block) string {
-	str := fmt.Sprintf("[greenyellow]НОМЕР:[white] %d\n[greenyellow]ВРЕМЯ:[white] %s\n[greenyellow]NONCE:[white] %d\n[greenyellow]ХЕШ:[white] %s\n[greenyellow]ТРАНЗАКЦИИ:[white]\n",
-		block.Number, time.Unix(block.Timestamp, 0), block.Nonce, block.Hash)
-
-	txs := make([]string, 0, len(block.Transactions))
-	for i, tx := range block.Transactions {
-		txs = append(txs, fmt.Sprintf("[greenyellow](%d)[white] %s", i+1, tx.Hash))
-	}
-
-	return str + strings.Join(txs, "\n")
-}
 
 func sprintTx(tx *types.Transaction) string {
 	var s strings.Builder

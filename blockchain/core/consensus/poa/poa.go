@@ -1,49 +1,61 @@
+//go:build poa
+
 package poa
 
 import (
 	"errors"
 	"kobla/blockchain/core/types"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var ErrBlockAlreadyMined = errors.New("block already mined")
 
-type Validator struct {
-	Url     string
-	Address types.Address
-}
-
 type ProofOfAuthority struct {
-	validators map[Validator]struct{}
+	validators      map[types.Address]struct{}
+	coinbaseAccount types.Account
 }
 
-func New(validators []Validator) types.ConsesusProtocol {
+func New(validators []string, coinbasePrivKey string) (types.ConsesusProtocol, error) {
 	poa := ProofOfAuthority{
-		validators: make(map[Validator]struct{}, len(validators)),
+		validators: make(map[types.Address]struct{}, len(validators)),
 	}
 
-	for _, validator := range validators {
-		poa.validators[validator] = struct{}{}
+	for _, v := range validators {
+		poa.validators[types.AddressFromString(v)] = struct{}{}
 	}
 
-	return &poa
+	coinbaseAcc, err := types.AccountFromPrivKey(coinbasePrivKey)
+	if err != nil {
+		return nil, err
+	}
+	poa.coinbaseAccount = coinbaseAcc
+
+	return &poa, nil
 }
 
 // updates the state of the block
-func (poa *ProofOfAuthority) Run(block *types.Block, _ any) error {
+func (poa *ProofOfAuthority) Run(block *types.Block) error {
 	block.SetHash()
-	return nil
+	return block.SetSignature(poa.coinbaseAccount)
 }
 
-func (poa *ProofOfAuthority) Validate(block *types.Block, meta any) bool {
+func (poa *ProofOfAuthority) Validate(block *types.Block) bool {
 	if block.Coinbase == types.ZeroAddress && block.Number == 0 {
 		return true
 	}
 
-	validator := Validator{
-		Url:     meta.(string),
-		Address: block.Coinbase,
+	if _, ok := poa.validators[block.Coinbase]; !ok {
+		return false
 	}
 
-	_, ok := poa.validators[validator]
-	return ok
+	ok, err := block.Coinbase.Verify(block.Hash, block.Signature)
+	if err != nil || !ok {
+		if err != nil {
+			log.WithError(err).Warn("can't verify signature")
+		}
+		return false
+	}
+
+	return true
 }

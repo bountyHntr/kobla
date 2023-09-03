@@ -1,0 +1,35 @@
+syntax = "proto3";
+package core;
+
+option go_package = "./blockchain/core/pb";
+
+message Block {
+    int64 timestamp = 1;
+    int64 number = 2;
+    repeated Transaction transactions = 3;
+    bytes prev_block_hash = 4;
+    bytes hash = 5;
+    bytes coinbase = 6;
+    bytes signature = 7;
+}
+
+enum TxStatus {
+    Fail = 0;
+    Success = 1;
+}
+
+message Transaction {
+    bytes sender = 1;
+    bytes receiver = 2;
+    uint64 amount = 3;
+    bytes data = 4;
+    bytes hash = 5;
+    TxStatus status = 6;
+    bytes signature = 7;
+}
+
+message ChainStatus {
+   int64 height = 1;
+   string address_from = 2;
+   repeated string known_addresses = 3;
+}

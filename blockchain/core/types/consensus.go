@@ -1,6 +1,6 @@
 package types
 
 type ConsesusProtocol interface {
-	Run(block *Block, meta any) error
-	Validate(block *Block, meta any) bool
+	Run(block *Block) error
+	Validate(block *Block) bool
 }

@@ -1,7 +1,10 @@
+//go:build poa
+
 package types
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"kobla/blockchain/core/common"
 	"kobla/blockchain/core/pb"
@@ -10,16 +13,18 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+var ErrEmptyHash = errors.New("hash is empty")
+
 const BlockReward = 10240
 
 type Block struct {
 	Timestamp     int64
-	Nonce         uint64
 	Number        int64
 	Transactions  []*Transaction
 	PrevBlockHash Hash
 	Coinbase      Address
 	Hash          Hash
+	Signature     []byte
 }
 
 var (
@@ -32,7 +37,6 @@ func NewBlock(
 	txs []*Transaction,
 	prevBlock *Block,
 	coinbase Address,
-	meta any,
 ) (block *Block, err error) {
 
 	block = &Block{
@@ -43,7 +47,7 @@ func NewBlock(
 		Coinbase:      coinbase,
 	}
 
-	if err = cons.Run(block, meta); err != nil {
+	if err = cons.Run(block); err != nil {
 		return nil, fmt.Errorf("Proof-Of-Work: %w", err)
 	}
 
@@ -59,7 +63,6 @@ func (b *Block) SetHash() {
 
 	data := bytes.Join([][]byte{
 		common.Int64ToBytes(b.Timestamp),
-		common.Int64ToBytes(b.Nonce),
 		common.Int64ToBytes(b.Number),
 		txs,
 		b.PrevBlockHash.Bytes(),
@@ -67,6 +70,20 @@ func (b *Block) SetHash() {
 	}, nil)
 
 	b.Hash = NewHash(data)
+}
+
+func (b *Block) SetSignature(account Account) error {
+	if b.Hash.isEmpty() {
+		return ErrEmptyHash
+	}
+
+	signature, err := account.Sign(b.Hash)
+	if err != nil {
+		return err
+	}
+
+	b.Signature = signature
+	return nil
 }
 
 func (b *Block) Copy() *Block {
@@ -77,6 +94,9 @@ func (b *Block) Copy() *Block {
 
 	blockCopy := *b
 	blockCopy.Transactions = txs
+
+	blockCopy.Signature = make([]byte, len(b.Signature))
+	copy(blockCopy.Signature, b.Signature)
 
 	return &blockCopy
 }
@@ -89,12 +109,12 @@ func (b *Block) Serialize() ([]byte, error) {
 
 	pbBlock := pb.Block{
 		Timestamp:     b.Timestamp,
-		Nonce:         b.Nonce,
 		Number:        b.Number,
 		Transactions:  txs,
 		PrevBlockHash: b.PrevBlockHash.Bytes(),
 		Hash:          b.Hash.Bytes(),
 		Coinbase:      b.Coinbase.Bytes(),
+		Signature:     b.Signature,
 	}
 
 	return proto.Marshal(&pbBlock)
@@ -118,11 +138,11 @@ func DeserializeBlock(data []byte) (*Block, error) {
 
 	return &Block{
 		Timestamp:     pbBlock.Timestamp,
-		Nonce:         pbBlock.Nonce,
 		Number:        pbBlock.Number,
 		Transactions:  txs,
 		PrevBlockHash: HashFromSlice(pbBlock.PrevBlockHash),
 		Hash:          HashFromSlice(pbBlock.Hash),
 		Coinbase:      AddressFromBytes(pbBlock.Coinbase),
+		Signature:     pbBlock.Signature,
 	}, nil
 }

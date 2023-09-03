@@ -7,7 +7,6 @@ require (
 	github.com/ddulesov/gogost v1.0.0
 	github.com/dgraph-io/badger/v3 v3.2103.5
 	github.com/gdamore/tcell/v2 v2.6.0
-	github.com/libp2p/go-reuseport v0.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/rivo/tview v0.0.0-20230621164836-6cc0565babaf
 	github.com/sirupsen/logrus v1.9.3

@@ -24,12 +24,11 @@ var (
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Config struct {
-	DBPath       string
-	Consensus    types.ConsesusProtocol
-	Url          string
-	ListeningUrl string
-	Nodes        []string
-	Genesis      bool
+	DBPath    string
+	Consensus types.ConsesusProtocol
+	Url       string
+	Nodes     []string
+	Genesis   bool
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,7 +65,7 @@ func New(cfg *Config) (*Blockchain, error) {
 		blockSubs: newSubscription[types.Block](),
 	}
 
-	bc.comm, err = newCommunicationManager(cfg.Url, cfg.ListeningUrl, cfg.Nodes, &bc)
+	bc.comm, err = newCommunicationManager(cfg.Url, cfg.Nodes, &bc)
 	if err != nil {
 		return nil, fmt.Errorf("new communication manager: %w", err)
 	}
@@ -108,12 +107,12 @@ func (bc *Blockchain) mineBlock(txs []*types.Transaction, coinbase types.Address
 		return err
 	}
 
-	newBlock, err := types.NewBlock(bc.cons, txs, bc.lastBlock(), coinbase, bc.comm.url)
+	newBlock, err := types.NewBlock(bc.cons, txs, bc.lastBlock(), coinbase)
 	if err != nil {
 		return fmt.Errorf("create new block: %w", err)
 	}
 
-	if err = bc.newBlock(newBlock, bc.comm.url); err != nil {
+	if err = bc.newBlock(newBlock); err != nil {
 		return fmt.Errorf("new block %d: %w", newBlock.Number, err)
 	}
 
@@ -122,13 +121,13 @@ func (bc *Blockchain) mineBlock(txs []*types.Transaction, coinbase types.Address
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func (bc *Blockchain) addBlock(block *types.Block, meta any) error {
+func (bc *Blockchain) addBlock(block *types.Block) error {
 
 	if err := validateTxs(block.Transactions, block.Coinbase); err != nil {
 		return err
 	}
 
-	if err := bc.newBlock(block, meta); err != nil && !errors.Is(err, ErrInvalidParentBlock) {
+	if err := bc.newBlock(block); err != nil && !errors.Is(err, ErrInvalidParentBlock) {
 		return fmt.Errorf("new block %d: %w", block.Number, err)
 	}
 
@@ -197,8 +196,8 @@ func (bc *Blockchain) saveNewBlock(block *types.Block) error {
 	return nil
 }
 
-func (bc *Blockchain) newBlock(block *types.Block, meta any) error {
-	if !bc.cons.Validate(block, meta) {
+func (bc *Blockchain) newBlock(block *types.Block) error {
+	if !bc.cons.Validate(block) {
 		return ErrConsensusBroken
 	}
 
