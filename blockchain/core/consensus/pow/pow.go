@@ -35,9 +35,10 @@ func (ProofOfWork) Run(block *types.Block) error {
 	}
 
 	for block.Nonce < maxNonce {
-		block.SetHash()
+		hash := block.CalcHash()
 
-		if hashIsValid(block.Hash) {
+		if hashIsValid(hash) {
+			block.Hash = hash
 			return nil
 		}
 
@@ -48,12 +49,7 @@ func (ProofOfWork) Run(block *types.Block) error {
 }
 
 func (ProofOfWork) Validate(block *types.Block) bool {
-	data, err := block.Serialize()
-	if err != nil {
-		return false
-	}
-
-	return hashIsValid(types.NewHash(data))
+	return hashIsValid(block.CalcHash())
 }
 
 func hashIsValid(hash types.Hash) bool {

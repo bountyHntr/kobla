@@ -21,7 +21,7 @@ type Config struct {
 }
 
 func Build() chain.Config {
-	cfgPath := flag.String("cfg", "config.yaml", "path to yaml config file")
+	cfgPath := flag.String("config", "config.yaml", "path to yaml config file")
 	flag.Parse()
 
 	var cfg Config

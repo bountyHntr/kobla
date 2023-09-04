@@ -47,6 +47,8 @@ func NewBlock(
 		Coinbase:      coinbase,
 	}
 
+	block.Hash = block.CalcHash()
+
 	if err = cons.Run(block); err != nil {
 		return nil, fmt.Errorf("Proof-Of-Work: %w", err)
 	}
@@ -54,7 +56,7 @@ func NewBlock(
 	return block, nil
 }
 
-func (b *Block) SetHash() {
+func (b *Block) CalcHash() Hash {
 
 	txs := make([]byte, 0, len(b.Transactions)*HashBytes)
 	for _, tx := range b.Transactions {
@@ -69,7 +71,7 @@ func (b *Block) SetHash() {
 		b.Coinbase.Bytes(),
 	}, nil)
 
-	b.Hash = NewHash(data)
+	return NewHash(data)
 }
 
 func (b *Block) SetSignature(account Account) error {

@@ -7,6 +7,6 @@ import (
 	"kobla/blockchain/core/types"
 )
 
-func newConsensus() types.ConsesusProtocol {
+func newConsensus(_ *Config) types.ConsesusProtocol {
 	return pow.New()
 }

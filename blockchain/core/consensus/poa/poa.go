@@ -9,7 +9,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var ErrBlockAlreadyMined = errors.New("block already mined")
+var (
+	ErrBlockAlreadyMined = errors.New("block already mined")
+	ErrPrivateKeyNotSet  = errors.New("private key not set")
+)
 
 type ProofOfAuthority struct {
 	validators      map[types.Address]struct{}
@@ -25,18 +28,23 @@ func New(validators []string, coinbasePrivKey string) (types.ConsesusProtocol, e
 		poa.validators[types.AddressFromString(v)] = struct{}{}
 	}
 
-	coinbaseAcc, err := types.AccountFromPrivKey(coinbasePrivKey)
-	if err != nil {
-		return nil, err
+	if len(coinbasePrivKey) != 0 {
+		coinbaseAcc, err := types.AccountFromPrivKey(coinbasePrivKey)
+		if err != nil {
+			return nil, err
+		}
+		poa.coinbaseAccount = coinbaseAcc
 	}
-	poa.coinbaseAccount = coinbaseAcc
 
 	return &poa, nil
 }
 
 // updates the state of the block
 func (poa *ProofOfAuthority) Run(block *types.Block) error {
-	block.SetHash()
+	if poa.coinbaseAccount.Address() == types.ZeroAddress {
+		return ErrPrivateKeyNotSet
+	}
+
 	return block.SetSignature(poa.coinbaseAccount)
 }
 
