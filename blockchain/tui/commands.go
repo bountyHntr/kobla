@@ -288,8 +288,6 @@ func getFormInput(form *tview.Form, idx int) string {
 }
 
 func newForm() *tview.Form {
-	const backgroundColor = 0x000003
-
 	form := tview.NewForm().
 		SetFieldBackgroundColor(backgroundColor).
 		SetFieldTextColor(tcell.ColorWhite).

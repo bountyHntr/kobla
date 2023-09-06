@@ -11,6 +11,8 @@ import (
 	"github.com/rivo/tview"
 )
 
+const backgroundColor = tcell.ColorBlack
+
 type TerminalUI struct {
 	bc    *chain.Blockchain
 	app   *tview.Application
@@ -79,6 +81,8 @@ func (tui *TerminalUI) configureHeader() {
 		SetTextAlign(tview.AlignCenter).
 		SetBorder(true).
 		SetTitle("KOBLA - KOLTSA OPEN BLOCKCHAIN LEARNING AID")
+
+	tui.header.SetBackgroundColor(backgroundColor)
 }
 
 func (tui *TerminalUI) configureCommands() {
@@ -106,10 +110,27 @@ func (tui *TerminalUI) configureCommands() {
 		}
 	})
 
+	tui.commands.SetChangedFunc(func(idx int, _, _ string, _ rune) {
+		switch Command(idx) {
+		case blockByNumber:
+			fmt.Fprint(tui.main.Clear(), blockByNumberTheory)
+		case blockByHash:
+			fmt.Fprint(tui.main.Clear(), blockByHashTheory)
+		case txByHash:
+		case balance:
+		case newAccount:
+		case sendTransaction:
+		case mineBlock:
+		case quit:
+		}
+	})
+
 	tui.addAllCommands().
 		SetShortcutColor(tcell.ColorGreenYellow).
 		SetBorder(true).
 		SetTitle("Команды")
+
+	tui.commands.SetBackgroundColor(backgroundColor)
 }
 
 func (tui *TerminalUI) configureMain() {
@@ -124,6 +145,7 @@ func (tui *TerminalUI) configureMain() {
 	})
 
 	tui.main.SetDynamicColors(true).SetBorder(true)
+	tui.main.SetBackgroundColor(backgroundColor)
 }
 
 func (tui *TerminalUI) configureMempool() {
@@ -135,6 +157,8 @@ func (tui *TerminalUI) configureMempool() {
 		SetDynamicColors(true).
 		SetBorder(true).
 		SetTitle("Мемпул")
+
+	tui.mempool.SetBackgroundColor(backgroundColor)
 }
 
 func (tui *TerminalUI) run() error {
