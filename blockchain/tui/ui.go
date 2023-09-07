@@ -117,11 +117,17 @@ func (tui *TerminalUI) configureCommands() {
 		case blockByHash:
 			fmt.Fprint(tui.main.Clear(), blockByHashTheory)
 		case txByHash:
+			fmt.Fprint(tui.main.Clear(), txByHashTheory)
 		case balance:
+			fmt.Fprint(tui.main.Clear(), balanceTheory)
 		case newAccount:
+			fmt.Fprint(tui.main.Clear(), newAccountTheory)
 		case sendTransaction:
+			fmt.Fprint(tui.main.Clear(), sendTransactionTheory)
 		case mineBlock:
+			fmt.Fprint(tui.main.Clear(), mineBlockTheory)
 		case quit:
+			tui.main.Clear()
 		}
 	})
 
