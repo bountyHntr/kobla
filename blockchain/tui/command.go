@@ -1,14 +1,19 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"kobla/blockchain/core/types"
 	"math/big"
+	"runtime/debug"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
+	"github.com/btcsuite/btcutil/base58"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
+	log "github.com/sirupsen/logrus"
 )
 
 type Command int
@@ -56,12 +61,12 @@ func (tui *TerminalUI) processBlockByNumberCommand() {
 
 		number, err := strconv.ParseInt(input, 10, 64)
 		if err != nil {
-			return fmt.Sprintf("Error: invalid block number: %s: %s", input, err)
+			return tui.printError(err, "Ошибка: неверный номер блока: %s", input)
 		}
 
 		block, err := tui.bc.BlockByNumber(number)
 		if err != nil {
-			return fmt.Sprintf("Error: can't get block %d: %s", number, err)
+			return tui.printError(err, "Ошибка: не удалость получить блок %d", number)
 		}
 
 		return sprintBlock(block)
@@ -77,6 +82,7 @@ func (tui *TerminalUI) processBlockByHashCommand() {
 		defer func() {
 			if r := recover(); r != nil {
 				s = fmt.Sprintf("Error: %s: %s", input, r)
+				s = tui.printError(fmt.Errorf("%s", r), "Ошибка: %s", input)
 			}
 		}()
 
@@ -85,7 +91,7 @@ func (tui *TerminalUI) processBlockByHashCommand() {
 		hash := types.HashFromString(input)
 		block, err := tui.bc.BlockByHash(hash)
 		if err != nil {
-			return fmt.Sprintf("Error: can't get block %s: %s", hash, err)
+			return tui.printError(err, "Ошибка: не удалось получить блок: %s", hash)
 		}
 
 		return sprintBlock(block)
@@ -103,7 +109,7 @@ func (tui *TerminalUI) processTxByHash() {
 		hash := types.HashFromString(input)
 		tx, err := tui.bc.TxByHash(hash)
 		if err != nil {
-			return fmt.Sprintf("Error: can't get tx %s: %s", hash, err)
+			return tui.printError(err, "Ошибка: не удалось получить транзакцию %s", hash)
 		}
 
 		return sprintTx(tx)
@@ -121,7 +127,7 @@ func (tui *TerminalUI) processBalance() {
 		address := types.AddressFromString(input)
 		balance, err := tui.bc.Balance(address)
 		if err != nil {
-			return fmt.Sprintf("Error: can't get balance %s: %s", address, err)
+			return tui.printError(err, "Ошибка: не удалось получить баланс %s", address)
 		}
 
 		return fmt.Sprintf("[greenyellow]АДРЕС:[white] %s\n[greenyellow]БАЛАНС:[white] %d", address, balance)
@@ -134,7 +140,7 @@ func (tui *TerminalUI) processNewAccount() {
 
 	account, err := types.NewAccount()
 	if err != nil {
-		fmt.Fprintf(tui.main, "Error: can't generate new account: %s", err)
+		tui.printError(err, "Ошибка: не удалось сгенирировать новый аккаунт")
 		return
 	}
 
@@ -168,7 +174,7 @@ func (tui *TerminalUI) processSendTxCommand() {
 
 		var amount big.Int
 		if _, ok := amount.SetString(getFormInput(form, 1), 10); !ok {
-			fmt.Fprintf(tui.main, "Error: invalid amount value")
+			tui.printError(errors.New("invalid amount value"), "Ошибка: неверная величина перевода %s", getFormInput(form, 1))
 			return
 		}
 
@@ -176,13 +182,13 @@ func (tui *TerminalUI) processSendTxCommand() {
 
 		signer, err := types.AccountFromPrivKey(getFormInput(form, 3))
 		if err != nil {
-			fmt.Fprintf(tui.main, "Error: invalid private key: %s", err)
+			tui.printError(err, "Ошибка: некорректный приватный ключ")
 			return
 		}
 
 		tx := types.NewTransaction(signer.Address(), receiver, amount.Uint64(), data)
 		if err := tx.WithSignature(signer); err != nil {
-			fmt.Fprintf(tui.main, "Error: can't sign transaction: %s", err)
+			tui.printError(err, "Ошибка: не удалось подписать транзакцию")
 			return
 		}
 
@@ -239,7 +245,7 @@ func (tui *TerminalUI) processMineBlockCommand() {
 			hash := types.HashFromString(getFormInput(form, i))
 			tx, err := tui.bc.TxByHashFromMempool(hash)
 			if err != nil {
-				fmt.Fprintf(tui.main, "Error: can't get %s tx from mempool: %s", hash, err)
+				tui.printError(err, "Ошибка: не удалось получить транзакцию %s из мемпула", hash)
 				return
 			}
 
@@ -247,7 +253,7 @@ func (tui *TerminalUI) processMineBlockCommand() {
 		}
 
 		if err := tui.bc.MineBlock(txs, coinbase); err != nil {
-			fmt.Fprintf(tui.main, "Error: can't mine block: %s", err)
+			tui.printError(err, "Ошибка: не удалось сформировать блок")
 			return
 		}
 
@@ -271,12 +277,21 @@ func (tui *TerminalUI) addInputField(inputField *tview.InputField, f func(string
 			tui.app.SetFocus(tui.commands)
 		case tcell.KeyEnter:
 			output := f(trimInput(inputField))
-			fmt.Fprint(tui.main.Clear(), output)
+			if output != "" {
+				fmt.Fprint(tui.main.Clear(), output)
+			}
 		}
 	})
 
 	tui.mflex.AddItem(inputField, 0, 1, false)
 	tui.app.SetFocus(inputField)
+}
+
+func (tui *TerminalUI) printError(err error, msg string, opt ...any) string {
+	fmt.Fprintf(tui.main.Clear(), msg, opt...)
+	log.Error(err)
+	debug.PrintStack()
+	return ""
 }
 
 func trimInput(f *tview.InputField) string {
@@ -299,4 +314,39 @@ func newForm() *tview.Form {
 		SetBorder(true)
 
 	return form
+}
+
+func sprintTx(tx *types.Transaction) string {
+	var s strings.Builder
+	s.WriteString(fmt.Sprintf("[greenyellow]ХЕШ:[white] %s\n", tx.Hash))
+
+	if tx.Sender != types.ZeroAddress {
+		s.WriteString(fmt.Sprintf("[greenyellow]ОТПРАВИТЕЛЬ:[white] %s\n", tx.Sender))
+	}
+
+	if tx.Amount != 0 {
+		s.WriteString(fmt.Sprintf("[greenyellow]ПОЛУЧАТЕЛЬ:[white] %s\n", tx.Receiver))
+		s.WriteString(fmt.Sprintf("[greenyellow]СУММА ПЕРЕВОДА:[white]: %d\n", tx.Amount))
+	}
+
+	s.WriteString("[greenyellow]СТАТУС:[white] ")
+	if tx.Status == types.TxSuccess {
+		s.WriteString("ВАЛИДНА\n")
+	} else {
+		s.WriteString("НЕВАЛИДНА\n")
+	}
+
+	s.WriteString("[greenyellow]ДАННЫЕ:[white] ")
+	if utf8.Valid(tx.Data) {
+		s.WriteString(string(tx.Data))
+	} else {
+		s.WriteString(base58.Encode(tx.Data))
+	}
+	s.WriteRune('\n')
+
+	if tx.Sender != types.ZeroAddress {
+		s.WriteString(fmt.Sprintf("[greenyellow]ПОДПИСЬ:[white] %s", base58.Encode(tx.Signature)))
+	}
+
+	return s.String()
 }
