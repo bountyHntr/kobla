@@ -2,8 +2,9 @@ package types_test
 
 import (
 	"crypto/rand"
-	"kobla/blockchain/core/types"
 	"testing"
+
+	"kobla/blockchain/core/types"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -13,11 +14,11 @@ func TestAccount(t *testing.T) {
 	assert.NoError(t, err)
 
 	address := acc.Address()
-	assert.NotNil(t, address)
-	assert.NotNil(t, address.String())
+	assert.NotEmpty(t, address)
+	assert.NotEmpty(t, address.String())
 
 	privKey := acc.PrivateKey()
-	assert.NotNil(t, privKey)
+	assert.NotEmpty(t, privKey)
 
 	_, err = types.AccountFromPrivKey("asfd")
 	assert.Error(t, err)
