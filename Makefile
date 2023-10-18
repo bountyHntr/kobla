@@ -10,6 +10,10 @@ build-pow:
 build-poa:
 	go build --tags poa -o kobla
 
+tests:
+	go test --tags pow ./...
+	go test --tags pow ./...
+
 config = config.yaml
 run:
 	./kobla 2> `date +%s`.log --config=$(config)

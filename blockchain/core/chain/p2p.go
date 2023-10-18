@@ -5,12 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"kobla/blockchain/core/pb"
-	"kobla/blockchain/core/types"
 	"net"
 	"strings"
 	"sync"
 	"time"
+
+	"kobla/blockchain/core/pb"
+	"kobla/blockchain/core/types"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"

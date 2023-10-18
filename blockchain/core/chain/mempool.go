@@ -2,8 +2,9 @@ package chain
 
 import (
 	"container/list"
-	"kobla/blockchain/core/types"
 	"sync"
+
+	"kobla/blockchain/core/types"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -26,6 +27,12 @@ func newMempool() *memoryPool {
 }
 
 func (mp *memoryPool) add(tx *types.Transaction) bool {
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+
+	if _, ok := mp.txs[tx.Hash]; ok {
+		return false
+	}
 
 	ok, err := tx.Sender.Verify(tx.Hash, tx.Signature)
 	if err != nil || !ok {
@@ -35,13 +42,6 @@ func (mp *memoryPool) add(tx *types.Transaction) bool {
 			WithField("hash", tx.Hash.String()).
 			Debug("skip")
 
-		return false
-	}
-
-	mp.mu.Lock()
-	defer mp.mu.Unlock()
-
-	if _, ok := mp.txs[tx.Hash]; ok {
 		return false
 	}
 

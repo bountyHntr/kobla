@@ -1,3 +1,5 @@
+//go:build poa
+
 package poa_test
 
 import (
