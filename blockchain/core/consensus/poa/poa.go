@@ -4,6 +4,7 @@ package poa
 
 import (
 	"errors"
+
 	"kobla/blockchain/core/types"
 
 	log "github.com/sirupsen/logrus"
@@ -51,6 +52,10 @@ func (poa *ProofOfAuthority) Run(block *types.Block) error {
 func (poa *ProofOfAuthority) Validate(block *types.Block) bool {
 	if block.Coinbase == types.ZeroAddress && block.Number == 0 {
 		return true
+	}
+
+	if block.Hash != block.CalcHash() {
+		return false
 	}
 
 	if _, ok := poa.validators[block.Coinbase]; !ok {
