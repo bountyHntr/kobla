@@ -59,11 +59,11 @@ func Run(bc *chain.Blockchain) error {
 
 func (tui *TerminalUI) configureApp() {
 	flex := tview.NewFlex().
-		AddItem(tui.commands, 0, 1, true).
+		AddItem(tui.commands, 0, 20, true).
 		AddItem(tui.mflex.SetDirection(tview.FlexRow).
 			AddItem(tui.header, 0, 1, false).
-			AddItem(tui.main, 0, 4, false), 0, 2, false).
-		AddItem(tui.mempool, 0, 1, false)
+			AddItem(tui.main, 0, 4, false), 0, 60, false).
+		AddItem(tui.mempool, 0, 20, false)
 
 	tui.app.SetRoot(flex, true)
 }
@@ -72,7 +72,7 @@ func (tui *TerminalUI) configureHeader() {
 
 	tui.header.SetChangedFunc(func() {
 		_, _, _, height := tui.header.GetRect()
-		tui.header.SetBorderPadding(height/4, 0, 0, 0)
+		tui.header.SetBorderPadding(height/10, 0, 0, 0)
 		tui.app.Draw()
 	})
 
@@ -185,7 +185,7 @@ func (tui *TerminalUI) updateMempool() {
 			tui.mempool.Clear()
 
 			for i, tx := range txs {
-				fmt.Fprintf(tui.mempool, "[greenyellow](%d)[white] %s\n", i+1, tx.Hash.String())
+				fmt.Fprintf(tui.mempool, "[greenyellow](%d)[white]%s\n", i+1, tx.Hash.String())
 			}
 		}
 	}()

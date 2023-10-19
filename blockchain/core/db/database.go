@@ -148,7 +148,7 @@ func (db *Database) Balance(address types.Address) (uint64, error) {
 
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
-			return 0, nil
+			return types.InitBalance, nil
 		}
 
 		return 0, err

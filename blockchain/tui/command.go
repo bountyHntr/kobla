@@ -325,7 +325,9 @@ func sprintTx(tx *types.Transaction) string {
 	}
 
 	if tx.Amount != 0 {
-		s.WriteString(fmt.Sprintf("[greenyellow]ПОЛУЧАТЕЛЬ:[white] %s\n", tx.Receiver))
+		if tx.Receiver != types.ZeroAddress {
+			s.WriteString(fmt.Sprintf("[greenyellow]ПОЛУЧАТЕЛЬ:[white] %s\n", tx.Receiver))
+		}
 		s.WriteString(fmt.Sprintf("[greenyellow]СУММА ПЕРЕВОДА:[white]: %d\n", tx.Amount))
 	}
 

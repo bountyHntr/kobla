@@ -20,7 +20,7 @@ func (tui *TerminalUI) updateLastBlock() {
 
 		for block := range blockSub {
 			fmt.Fprintf(tui.header.Clear(),
-				"[greenyellow]ПОСЛЕДНИЙ БЛОК:[white]\n[greenyellow]НОМЕР:[white] %d [greenyellow]ВРЕМЯ:[white] %s\n[greenyellow]ХЕШ:[white] %s\n"+
+				"[greenyellow]ПОСЛЕДНИЙ БЛОК:[white]\n[greenyellow]НОМЕР:[white] %d [greenyellow]ВРЕМЯ:[white] %s\n[greenyellow]ХЕШ:[white]%s\n"+
 					"\n[yellow]ЧТОБЫ ВЫБРАТЬ КОМАНДУ/ВВЕСТИ ДАННЫЕ, НАЖМИТЕ [greenyellow]ENTER[yellow]; ЧТОБЫ ОТМЕНИТЬ ДЕЙСТВИЕ - [greenyellow]ESC[white]",
 				block.Number, time.Unix(block.Timestamp, 0), block.Hash.String(),
 			)
