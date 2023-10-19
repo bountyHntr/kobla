@@ -7,7 +7,7 @@ proto-compile-poa:
 tests:
 	go test --tags poa ./blockchain/...
 	go test --tags pow ./blockchain/...
-	go test --tags pow --timeout 5m ./systest/
+	go test --tags pow --timeout 1m ./systest/
 	
 build-pow:
 	go build --tags pow	-o kobla

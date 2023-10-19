@@ -187,11 +187,15 @@ func (cm *communicationManager) handleNewBlock(data []byte) error {
 		return fmt.Errorf("deserialize block: %w", err)
 	}
 
-	if err := cm.bc.addBlock(block); err != nil {
+	var ok bool
+	if ok, err = cm.bc.addBlock(block); err != nil && !ok {
 		return fmt.Errorf("add block: %w", err)
 	}
 
-	log.WithField("number", block.Number).Debug("new block")
+	if err == nil {
+		log.WithField("number", block.Number).Debug("new block")
+	}
+
 	return nil
 }
 
@@ -299,10 +303,13 @@ func (cm *communicationManager) sync(syncNode string, lastBlockNumber int64) err
 			return fmt.Errorf("get block: %w", err)
 		}
 
-		if err := cm.bc.addBlock(block); err != nil {
+		var ok bool
+		if ok, err = cm.bc.addBlock(block); err != nil && !ok {
 			return fmt.Errorf("add block: %w", err)
 		}
-		log.WithField("number", block.Number).Debug("sync: new block")
+		if err == nil {
+			log.WithField("number", block.Number).Debug("sync: new block")
+		}
 	}
 
 	return nil

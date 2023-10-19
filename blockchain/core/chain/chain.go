@@ -20,6 +20,7 @@ func init() {
 
 var (
 	ErrInvalidParentBlock  = errors.New("invalid parent block")
+	ErrOldBlock            = errors.New("old block")
 	ErrInvalidTxSignature  = errors.New("invalid tx signature")
 	ErrZeroAddressScam     = errors.New("zero address scam")
 	ErrDuplicateCoinbaseTx = errors.New("duplicate coinbase tx")
@@ -127,17 +128,20 @@ func (bc *Blockchain) mineBlock(txs []*types.Transaction, coinbase types.Address
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func (bc *Blockchain) addBlock(block *types.Block) error {
+func (bc *Blockchain) addBlock(block *types.Block) (bool, error) {
+	if block.Number <= bc.lastBlock().Number {
+		return true, ErrOldBlock
+	}
 
 	if err := validateTxs(block.Transactions, block.Coinbase); err != nil {
-		return err
+		return false, err
 	}
 
-	if err := bc.newBlock(block); err != nil && !errors.Is(err, ErrInvalidParentBlock) {
-		return fmt.Errorf("new block %d: %w", block.Number, err)
+	if err := bc.newBlock(block); err != nil {
+		return false, fmt.Errorf("new block %d: %w", block.Number, err)
 	}
 
-	return nil
+	return true, nil
 }
 
 func validateTxs(txs []*types.Transaction, coinbase types.Address) error {

@@ -93,7 +93,7 @@ func newNode(id int) *chain.Blockchain {
 		DBPath:    buildDBPath(id),
 		Consensus: pow.New(),
 		Url:       fmt.Sprintf("localhost:809%d", id),
-		Genesis:   true,
+		Genesis:   id == 1,
 		Nodes:     []string{fmt.Sprintf("localhost:809%d", id-1)},
 	})
 	if err != nil {
