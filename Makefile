@@ -3,16 +3,17 @@ proto-compile-pow:
 
 proto-compile-poa:
 	protoc --go_out=. --go_opt=paths=source_relative ./blockchain/core/pb/blockchain_poa.proto
+
+tests:
+	go test --tags poa ./blockchain/...
+	go test --tags pow ./blockchain/...
+	go test --tags pow --timeout 5m ./systest/
 	
 build-pow:
 	go build --tags pow	-o kobla
 
 build-poa:
 	go build --tags poa -o kobla
-
-tests:
-	go test --tags pow ./...
-	go test --tags pow ./...
 
 config = config.yaml
 run:

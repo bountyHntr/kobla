@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"kobla/blockchain/core/chain"
 	"kobla/blockchain/core/consensus/pow"
@@ -15,6 +16,10 @@ import (
 )
 
 func TestSystem(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
 	defer func() {
 		r := recover()
 		assert.Empty(t, r)
@@ -25,6 +30,8 @@ func TestSystem(t *testing.T) {
 		node = append(node, newNode(i))
 		defer dropDB(i)
 	}
+
+	time.Sleep(5 * time.Second)
 
 	var acc []types.Account
 	for i := 0; i < 3; i++ {
@@ -37,7 +44,7 @@ func TestSystem(t *testing.T) {
 	err := tx.WithSignature(acc[0])
 	assert.NoError(t, err)
 
-	ch := make(chan *types.Void)
+	ch := make(chan *types.Void, 5)
 	subID := node[0].SubscribeMempoolUpdates(ch)
 	defer node[0].UnsubscribeMempoolUpdates(subID)
 
@@ -55,6 +62,8 @@ func TestSystem(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, tx, tx2)
 
+	time.Sleep(2 * time.Second)
+
 	block, err := node[1].BlockByNumber(0)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, block)
@@ -71,6 +80,8 @@ func TestSystem(t *testing.T) {
 	assert.Equal(t, node[0].MempoolSize(), 1)
 	<-ch
 	assert.Equal(t, node[0].MempoolSize(), 0)
+
+	time.Sleep(2 * time.Second)
 
 	block, err = node[0].BlockByNumber(1)
 	assert.NoError(t, err)

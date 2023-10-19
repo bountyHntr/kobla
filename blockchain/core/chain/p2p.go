@@ -76,7 +76,7 @@ func (cm *communicationManager) listen() error {
 		defer ticker.Stop()
 
 		for ; true; <-ticker.C {
-			if err := cm.sendSync(); err != nil {
+			if err := cm.sendSync(""); err != nil {
 				log.WithError(err).Error("sync")
 			}
 		}
@@ -191,6 +191,7 @@ func (cm *communicationManager) handleNewBlock(data []byte) error {
 		return fmt.Errorf("add block: %w", err)
 	}
 
+	log.WithField("number", block.Number).Debug("new block")
 	return nil
 }
 
@@ -202,6 +203,9 @@ func (cm *communicationManager) handleNewTx(data []byte) error {
 
 	if ok := cm.bc.mempool.add(tx); ok {
 		cm.broadcast(tx)
+		log.WithField("hash", tx.Hash).Debug("new tx")
+	} else {
+		log.WithField("hash", tx.Hash).Debug("skip tx")
 	}
 
 	return nil
@@ -209,11 +213,12 @@ func (cm *communicationManager) handleNewTx(data []byte) error {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func (cm *communicationManager) sendSync() error {
-	syncNode := cm.randomNode()
+func (cm *communicationManager) sendSync(syncNode string) error {
 	if syncNode == "" {
-		log.Debug("skip sync")
-		return nil
+		if syncNode = cm.randomNode(); syncNode == "" {
+			log.Debug("skip sync")
+			return nil
+		}
 	}
 
 	log.WithField("sync_node", syncNode).Debug("send sync")
@@ -244,6 +249,7 @@ func (cm *communicationManager) sendSync() error {
 	}
 
 	go func() {
+		log.WithField("height", response.Height).Debug("sync")
 		if err := cm.sync(syncNode, response.Height); err != nil {
 			log.Errorf("sync from node %s: %s", syncNode, err)
 		}
@@ -296,6 +302,7 @@ func (cm *communicationManager) sync(syncNode string, lastBlockNumber int64) err
 		if err := cm.bc.addBlock(block); err != nil {
 			return fmt.Errorf("add block: %w", err)
 		}
+		log.WithField("number", block.Number).Debug("sync: new block")
 	}
 
 	return nil
@@ -320,7 +327,7 @@ func (cm *communicationManager) broadcast(msg types.Serializable) {
 		command = commandNewBlock
 	}
 
-	for node := range cm.knownNodes {
+	for _, node := range cm.copyNodes() {
 
 		conn, err := cm.newConnection(node)
 		if err != nil {
@@ -342,12 +349,18 @@ func (cm *communicationManager) addNewNode(node string) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	if _, ok := cm.knownNodes[node]; ok {
+	if _, ok := cm.knownNodes[node]; ok || node == cm.url {
 		return
 	}
 
 	log.WithField("node", node).Debug("add new node")
 	cm.knownNodes[node] = struct{}{}
+
+	go func() {
+		if err := cm.sendSync(node); err != nil {
+			log.WithError(err).Error("sync")
+		}
+	}()
 }
 
 func (cm *communicationManager) removeNode(node string) {
